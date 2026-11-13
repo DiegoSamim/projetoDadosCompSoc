@@ -1,0 +1,405 @@
+# Guia da ferramenta `hdb`
+
+Este guia explica **como a ferramenta funciona** e **como usá-la**, passo a passo. O que ainda falta construir está em [planejamento.md](planejamento.md). A parte de linguagem natural (limpeza do texto e tópicos) está em [linguagem_natural.md](linguagem_natural.md), e um exemplo com dados reais, em [notebooks/como_funciona.ipynb](notebooks/como_funciona.ipynb).
+
+## Para que serve
+
+A ferramenta descobre quais jornais existem, busca páginas de jornais do século XIX na Hemeroteca Digital Brasileira (HDB), lê o texto delas e separa cada página em **anúncios**. Tudo fica num banco de dados compartilhado (Supabase), para que várias pessoas trabalhem sem repetir nada.
+
+## Como funciona
+
+```
+  Site da HDB
+      │
+      │ 1. buscar   ─ procura um termo num jornal e anota as páginas onde ele aparece (sem CAPTCHA)
+      ▼
+  Banco: páginas "pendentes"
+      │
+      │ 2. capturar ─ abre cada página num navegador; uma pessoa digita o CAPTCHA;
+      │               baixa a imagem e lê o texto com OCR
+      ▼
+  Banco: texto de cada página ("ok")
+      │
+      │ 3. anuncios ─ descobre as colunas da página e separa os anúncios
+      ▼
+  Banco: anúncios (com título, palavra de abertura e texto limpo)
+      │
+      │ 4. campos   ─ tipo (fuga, venda…), sexo, idade, nação, nome, recompensa
+      ▼
+  Banco: anúncios com campos e período legal (view anuncios_completos)
+      │
+      │ 5. (a construir) corpus padronizado e tópicos ─ ver linguagem_natural.md
+      ▼
+  Banco: tópicos de cada anúncio → comparação entre os períodos legais
+```
+
+### As peças, uma a uma
+
+**A busca da HDB.** A HDB diz em quais **páginas** um termo aparece, não em quais anúncios. Ela busca a **palavra exata**:
+
+- ignora acentos e maiúsculas;
+- `*` no fim pega variações (`escrav*` = escravo, escrava, escravos…);
+- aspas buscam a **frase colada** (`"escravo fugido"`);
+- não existe OU nem NÃO.
+
+Quais termos usar e quantas páginas cada um tem está em [termos_busca.md](termos_busca.md).
+
+**O CAPTCHA.** Desde 03/10/2025 a HDB pede um código de imagem para mostrar as páginas. A ferramenta **não tenta resolver o código sozinha**: ela mostra a imagem do código, uma pessoa digita, e o resto continua automaticamente. Até agora o código foi pedido uma vez a cada acervo aberto, e não a cada página.
+
+**O OCR.** OCR (reconhecimento óptico de caracteres) é o programa que "lê" a foto da página e devolve o texto. Usamos o **Tesseract**, com o modelo de português. Ele lê a imagem em tons de cinza; se sair pouco texto, tenta de novo em resolução maior. Em jornais antigos ele erra letras ("foglo" em vez de "fogão"), principalmente nas páginas densas dos anos 1850 a 1880.
+
+**A separação em anúncios.** O OCR devolve a página inteira, com linhas de colunas vizinhas misturadas. A ferramenta usa a **posição de cada palavra** para:
+1. cortar as linhas onde há um espaço grande entre palavras (o vão entre colunas);
+2. descobrir onde começa cada coluna;
+3. ler coluna por coluna, de cima para baixo;
+4. começar um anúncio novo quando encontra um título em letras grandes, uma palavra de abertura (`VENDE-SE`, `FUGIO`, `ALUGA-SE`, `PRECISA-SE`…), um aviso numerado ("34."), um título de seção ("ESCRAVOS FUGIDOS") ou um espaço vertical grande.
+
+É uma regra **heurística**: funciona bem na maioria das páginas, mas pode errar. Anúncios que provavelmente misturam colunas ficam marcados como `largo`.
+
+**O banco e o trabalho sem retrabalho.**
+- Cada página tem um **status**: `pendente` (ainda não lida), `reservada` (alguém está capturando), `ok` (lida) ou `erro`.
+- Quando alguém captura, o banco **reserva** um lote de páginas para essa pessoa. Duas pessoas nunca recebem a mesma página.
+- Uma página `ok` nunca é capturada de novo.
+- Se a captura cair, as páginas reservadas voltam para a fila (na hora, ou em 30 minutos se o programa for fechado à força).
+- Falhas de captura voltam para a fila até 3 vezes. Falhas de OCR não voltam, porque capturar de novo daria o mesmo resultado; a imagem fica guardada para estudo.
+
+## O que precisa estar pronto
+
+Uma vez por computador:
+
+| Item | Para que serve |
+|---|---|
+| Python com o ambiente do projeto (`.venv`) e os pacotes de `requirements.txt` | rodar a ferramenta |
+| Navegador do Playwright: `.venv/bin/python -m playwright install chromium` | abrir as páginas da HDB |
+| Tesseract com o idioma português (pacotes `tesseract-ocr` e `tesseract-ocr-por`) | ler o texto (OCR) |
+| Arquivo `.env` na pasta do projeto, com `SUPABASE_URL` e `SUPABASE_SECRET_KEY` | acessar o banco |
+
+O `.env` contém a **chave secreta** do banco. Não o envie em grupos de mensagem nem o publique; peça a quem administra o projeto.
+
+Para conferir se está tudo certo:
+
+```bash
+tesseract --list-langs                      # deve listar "por"
+PYTHONPATH=src .venv/bin/python -m hdb status   # deve mostrar as páginas do banco, sem erro de chave
+```
+
+## Antes de cada sessão
+
+Abra o terminal na pasta do projeto e rode:
+
+```bash
+cd /home/diego/programacao/projetoDadosCompSoc
+export PYTHONPATH=src
+PY=.venv/bin/python
+```
+
+Todos os exemplos abaixo usam `$PY -m hdb ...`.
+
+## O caminho recomendado: a amostra do grupo
+
+Se você só quer ajudar a coletar, este é o caminho. O plano (quais termos, quais jornais, quantas páginas) já está decidido em [termos_busca.md](termos_busca.md), seção "O que vamos buscar", e guardado em `scripts/amostra.py`.
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/amostra.py situacao --pessoa N                 # 0. ver o que falta
+PYTHONPATH=src .venv/bin/python scripts/amostra.py listar --pessoa N                   # 1. listar (sem CAPTCHA, sozinho)
+PYTHONPATH=src .venv/bin/python scripts/amostra.py capturar --pessoa N --quem SeuNome  # 2. capturar (você digita o CAPTCHA)
+$PY -m hdb anuncios                                                         # 3. separar os anúncios
+$PY -m hdb campos                                                           # 4. extrair os campos
+$PY -m hdb relatorio                                                        # 5. registrar o método
+```
+
+- **`N`** é o seu número (1, 2 ou 3) na divisão do [planejamento](planejamento.md). Ele limita os comandos às suas células.
+- **`situacao`** mostra, para cada célula (tipo × período), quantas páginas foram listadas e quantas capturadas. Sem `--pessoa`, mostra a amostra inteira.
+- **`listar`** e **`capturar`** são retomáveis. Se parar, rode de novo e o script continua de onde estava, sem repetir nenhuma página.
+- **Várias pessoas** podem rodar o `capturar` ao mesmo tempo. O banco nunca entrega a mesma página a duas.
+- **Imagens:** o `capturar` do script guarda as imagens em `data/amostra/` (uns 6 MB por página), porque o `anuncios` ainda precisa delas.
+- Os passos abaixo explicam cada comando por dentro, para quem quiser ir além da amostra.
+
+## Passo a passo
+
+### 1. Escolher o termo e o acervo
+
+O **acervo** é um jornal num intervalo de anos, identificado por um código (`bib`). Os mais usados:
+
+| Código | Jornal | Anos |
+|---|---|---|
+| `364568_01` | Jornal do Commercio (RJ) | 1827–1829 |
+| `364568_02` | Jornal do Commercio (RJ) | 1830–1839 |
+| `364568_03` | Jornal do Commercio (RJ) | 1840–1849 |
+| `364568_04` | Jornal do Commercio (RJ) | 1850–1859 |
+| `364568_05` | Jornal do Commercio (RJ) | 1860–1869 |
+| `364568_06` | Jornal do Commercio (RJ) | 1870–1879 |
+| `364568_07` | Jornal do Commercio (RJ) | 1880–1889 |
+| `094170_01` | Diário do Rio de Janeiro | 1821–1858 |
+| `094170_02` | Diário do Rio de Janeiro | 1860–1878 |
+
+A lista completa e as contagens de cada termo estão em [termos_busca.md](termos_busca.md). Para achar o código de outro jornal, abra-o no site da HDB: o código aparece no endereço, depois de `bib=`.
+
+### 2. Listar as páginas: `buscar`
+
+```bash
+$PY -m hdb buscar --bib 364568_04 --termo '"escrav* fugid*"' --limite 100
+```
+
+- `--termo`: frases vão entre aspas duplas, e o conjunto entre aspas simples, como no exemplo.
+- `--limite`: quantas ocorrências listar. Sem ele, lista todas.
+- **O que acontece:** a ferramenta abre a busca na HDB e anda de página em página, gravando cada uma como `pendente`. Não pede CAPTCHA. Leva cerca de 3,6 segundos por página.
+- **Resultado:** `100 de 671 ocorrências de '"escrav* fugid*"' no banco.`
+- Se cair no meio, rode o mesmo comando de novo: ele continua de onde parou.
+
+### 3. Capturar e ler: `capturar`
+
+```bash
+$PY -m hdb capturar --bib 364568_04 --termo '"escrav* fugid*"' --aleatorio --max-paginas 30 --quem ana --guardar-imagens data/amostra
+```
+
+| Opção | O que faz |
+|---|---|
+| `--bib`, `--termo` | só páginas deste acervo e deste termo |
+| `--aleatorio` | sorteia as páginas; sem ela, segue a ordem do jornal |
+| `--max-paginas` | quantas páginas nesta execução (padrão 50) |
+| `--quem` | seu nome, para o banco saber quem capturou (padrão: usuário do computador) |
+| `--guardar-imagens DIR` | guarda uma cópia de cada imagem (~3,5 MB por página); **hoje é necessário para separar os anúncios depois** |
+| `--modo janela` | mostra o navegador; o CAPTCHA é digitado na própria janela |
+| `--workers` | quantas leituras de OCR ao mesmo tempo (padrão 4; mais que isso pode faltar memória) |
+
+**Quando aparecer o CAPTCHA** (modo padrão):
+1. O terminal mostra `CAPTCHA: abra file:///.../data/captura/captcha.png e digite o código`.
+2. Abra a imagem (no VS Code, Ctrl+clique no caminho) e digite os números.
+3. Enter sem nada troca a imagem do código, se estiver ilegível.
+4. Se errar, ele avisa "Código incorreto" e pede de novo.
+
+**Durante a captura,** cada página aparece como `364568_04 p.40: ok` ou com o erro. No fim:
+
+```
+Resumo: 28 ok, 2 erros, 1 CAPTCHAs resolvidos (páginas por CAPTCHA: 28.0).
+```
+
+**Para parar, use Ctrl+C.** O que já foi gravado fica, e o resto volta para a fila.
+
+Cada página leva em média uns 40 segundos, quase tudo de OCR. Páginas de jornais mais densos (anos 1880) levam mais.
+
+### 4. Separar os anúncios: `anuncios`
+
+```bash
+$PY -m hdb anuncios --pasta data/amostra --depurar data/depuracao/paginas
+```
+
+- **Precisa das imagens em disco** (as que foram capturadas com `--guardar-imagens`). Isso vai mudar quando a separação for feita dentro da captura (atividade 3.1 do planejamento).
+- Na primeira vez, refaz o OCR para obter a posição das palavras e guarda em `data/ocr_palavras/`. Nas seguintes, usa essa cópia e leva segundos.
+- **Resultado por página:** `364568_03 p.44: 4 colunas, 622 segmentos, 66 anúncios, 24 com abertura, 14 com título`.
+- `--depurar DIR` cria uma imagem por página com as colunas (linhas vermelhas) e cada anúncio num retângulo numerado. É a melhor forma de conferir se a separação funcionou.
+- `--versao` (padrão `v2`) dá nome à versão da regra. Rodar de novo a mesma versão substitui os anúncios dela; uma versão nova convive com as antigas, o que permite comparar.
+
+### 5. Ver o andamento: `status`
+
+```bash
+$PY -m hdb status
+```
+
+Mostra quantas páginas há em cada situação (por acervo e por termo), os últimos erros e quantas páginas foram capturadas por CAPTCHA.
+
+### 6. Descobrir os periódicos de um estado: `acervos`
+
+```bash
+$PY -m hdb acervos --local RJ --periodo "1850 - 1859"
+```
+
+- Serve para saber **quais jornais** a HDB tem no Rio de Janeiro nos anos 1850 e qual é o código (`bib`) de cada um.
+- A ferramenta abre a tela de busca, percorre a lista de periódicos um a um e grava o código e os anos de cada.
+- `--sonda` é a palavra usada para abrir cada periódico (padrão: `janeiro`, `rio`, `anno`). Repita a opção para dar reservas: `--sonda janeiro --sonda rio`.
+- `--limite 10` consulta só 10 periódicos nesta execução, bom para testar. `--modo janela` mostra o navegador.
+- Se parar no meio, rode de novo: continua de onde parou.
+- Se a tela pedir CAPTCHA, a ferramenta **para** e avisa. Ela não o resolve.
+
+### 7. Ver o panorama: `panorama`
+
+```bash
+$PY -m hdb panorama --local RJ --periodo "1850 - 1859" --termo '"escrav* fugid*"'
+```
+
+- Conta, em cada periódico da lista, em quantas **páginas** o termo aparece, e mostra um ranking com: posição, periódico, código, anos, páginas com o termo, total de páginas do acervo e percentual.
+- Rode antes o `acervos` para o mesmo local e período.
+- `--termo` pode ser repetido para vários termos. `--ordenar percentual` ordena pela proporção de páginas, em vez do número de páginas. `--recontar` refaz contagens já guardadas. `--sem-total` não calcula o total de páginas (e, sem ele, não há percentual).
+- **Atenção ao aviso "cobre mais que a década":** a HDB conta o acervo inteiro. Um jornal que vai de 1840 a 1869 aparece na lista de 1850, mas a contagem inclui os outros anos.
+- Não é preciso CAPTCHA: são só consultas de contagem.
+
+### 8. Extrair os campos dos anúncios: `campos`
+
+```bash
+$PY -m hdb campos --versao-anuncios v2 --versao c2
+```
+
+- Lê os anúncios já separados (versão `v2`) e, para cada um, grava na tabela `anuncio_campos`:
+  - o **tipo**: `fuga`, `venda`, `compra`, `aluguel`, `ama_de_leite` ou `outro`; e `procura`, que é verdadeiro quando quem anuncia quer obter alguém (COMPRA-SE, PRECISA-SE);
+  - **sexo**, **idade** (mínima e máxima), **nações**, **cores**, **condição** (escravizado, forro, livre), **nomes**, **ofícios**, **recompensa**, **valor** e **endereço**;
+  - as **evidências**: o trecho do texto que justificou cada campo, para você conferir.
+- `--versao` (padrão `c2`, a atual) dá nome à versão da extração. Rodar de novo a mesma versão substitui; uma versão nova convive com as antigas. `--limite 100` processa só 100 anúncios, para testar.
+- Não usa internet nem CAPTCHA, só o banco. No fim imprime um resumo: anúncios por tipo e por sexo, quantos têm idade, as nações mais comuns, quantos têm nome e recompensa.
+
+**Limites da extração de campos:**
+
+- É **heurística**: regras sobre palavras, não uma leitura inteligente. O texto vem do OCR de jornais antigos, com grafia da época e letras erradas, então há erros e lacunas.
+- **Confira por amostra:** sorteie alguns anúncios e compare cada campo com o texto (use as evidências).
+- O **sexo fica vazio** quando o anúncio não tem contexto de pessoa. "Preta" de seda ou "escravo" passageiro de navio, por exemplo, não contam como a pessoa anunciada.
+- Quando a separação junta dois anúncios vizinhos num só, os campos saem misturados (sexo `ambos`, por exemplo).
+- Anúncios de várias pessoas podem receber o sexo `ambos`, ou nomes e idades misturados.
+- Nenhum campo foi conferido por pessoas; não há taxa de acerto medida.
+
+### 9. Gerar o relatório: `relatorio`
+
+```bash
+$PY -m hdb relatorio
+$PY -m hdb relatorio --saida relatorios/minha_versao.md
+```
+
+- Escreve um arquivo Markdown que explica **como o corpus foi formado**: regras da busca da HDB, termos e acervos, capturas (quem, quantas, CAPTCHAs), OCR, anúncios e campos, panorama, limites conhecidos e créditos.
+- Sem `--saida`, o arquivo vai para `relatorios/relatorio_<data>.md`. O comando imprime o caminho.
+- Tudo vem do banco: rode depois de capturar ou extrair para o relatório sair atualizado. Serve de base para a seção de método do trabalho.
+
+### 10. Consultar os dados no banco
+
+Os dados ficam no Supabase. No painel do projeto, abra o **SQL Editor** e rode consultas como estas. **Não há exportação em CSV ou JSON pela ferramenta: os dados ficam no banco** e se consultam por SQL.
+
+Anúncios com palavras de interesse:
+
+```sql
+select p.bib, p.ano, p.pagina_fisica, a.ordem, a.abertura, a.texto
+from anuncios a
+join paginas p on p.id = a.pagina_id
+where a.versao = 'v2'
+  and a.busca @@ to_tsquery('portuguese', 'escravo | preta | crioulo | moleque')
+order by p.bib, p.pagina_fisica, a.ordem;
+```
+
+A busca em português junta variações: `preta` também acha `preto` e `pretas`.
+
+O texto inteiro de uma página:
+
+```sql
+select p.bib, p.pagina_fisica, t.motor, t.confianca, t.texto
+from textos_atuais t
+join paginas p on p.id = t.pagina_id
+where p.bib = '364568_04' and p.pagina_fisica = 320;
+```
+
+Ranking do panorama (a view `panorama`):
+
+```sql
+select nome_lista, bib, ano_inicio, ano_fim, termo, paginas, total_paginas,
+       round(percentual * 100, 2) as pct, cobre_mais_que_a_decada
+from panorama
+where local = 'RJ' and periodo = '1850 - 1859' and termo = '"escrav* fugid*"'
+order by paginas desc;
+```
+
+Anúncios de fuga com recompensa, por período legal (a view `anuncios_completos`; filtre sempre por `versao` e `c_versao`):
+
+```sql
+select periodo_legal, count(*) as anuncios
+from anuncios_completos
+where versao = 'v2' and c_versao = 'c2' and c_tipo = 'fuga' and c_recompensa
+group by periodo_legal
+order by periodo_legal;
+```
+
+Anúncios de venda de mulheres, com idade e nação:
+
+```sql
+select ano, acervo, c_idade_min, c_idade_max, c_nacoes, c_nomes, c_valor, texto
+from anuncios_completos
+where versao = 'v2' and c_versao = 'c2' and c_tipo = 'venda' and c_sexo = 'f'
+order by ano;
+```
+
+Conferir uma amostra de 20 anúncios com o trecho que justificou cada campo:
+
+```sql
+select id, c_tipo, c_sexo, c_nacoes, c_evidencias, texto
+from anuncios_completos
+where versao = 'v2' and c_versao = 'c2'
+order by random()
+limit 20;
+```
+
+## Outros comandos
+
+| Comando | Para que serve |
+|---|---|
+| `reprocessar` | refaz o OCR de imagens guardadas em disco (sem internet nem CAPTCHA) e mostra o antes e depois de cada página. Útil para testar melhorias do OCR. |
+| `importar` | carrega no banco dados da primeira versão da ferramenta (arquivos CSV e imagens antigas). Só foi usado uma vez. |
+| `scripts/contar_termos.py` | conta em quantas páginas cada termo aparece em cada acervo. Para testar termos novos, acrescente-os à lista do arquivo e rode: ele conta só o que falta. |
+| `scripts/contar_paginas.py` | conta o total de páginas de cada acervo. |
+
+Testes automáticos (não usam internet nem banco): `$PY -m pytest`.
+
+## Onde ficam as coisas
+
+**No banco (Supabase):**
+
+| Tabela | O que guarda |
+|---|---|
+| `acervos` | os jornais (código, nome, anos e total de páginas) |
+| `paginas` | cada página: acervo, número, ano, edição, link e status |
+| `ocorrencias` | em que página cada termo foi encontrado, e em que posição da busca |
+| `textos_ocr` | o texto lido de cada página; uma página pode ter mais de uma leitura (a view `textos_atuais` dá a mais recente) |
+| `tentativas` | histórico: quem capturou, quando, quanto tempo levou, quantos CAPTCHAs, e os erros |
+| `anuncios` | cada anúncio: página, versão, ordem, coluna, título, palavra de abertura, texto bruto, texto limpo, confiança e posição |
+| `acervos_periodos` | a lista de periódicos de cada local e período (posição na lista, nome e código `bib`) |
+| `contagens` | em quantas páginas do acervo inteiro cada termo aparece |
+| `anuncio_campos` | tipo e campos extraídos de cada anúncio, por versão da extração, com as evidências |
+
+E duas "views" (consultas prontas, que se usam como tabelas): `panorama` (o ranking de acervos por termo) e `anuncios_completos` (anúncio, página, acervo, período legal e campos juntos).
+
+**No computador (pasta `data/`):**
+
+| Pasta | O que tem |
+|---|---|
+| `data/amostra/` | imagens guardadas com `--guardar-imagens` |
+| `data/ocr_palavras/` | posição das palavras de cada página (cópia que evita refazer o OCR) |
+| `data/depuracao/` | imagens de conferência da separação de anúncios |
+| `data/falhas_ocr/` | imagens em que o OCR falhou |
+| `data/tmp/` | imagens à espera do OCR (apagadas depois de gravar no banco) |
+| `data/captura/` | o perfil do navegador e a imagem do CAPTCHA |
+
+## Trabalho em grupo
+
+- Cada pessoa usa `--quem` com o próprio nome.
+- Podem capturar ao mesmo tempo: o banco reparte as páginas.
+- Combinem quem lista quais termos, para não listarem a mesma busca em paralelo (não estraga nada, mas gasta tempo).
+- Rodem o `status` antes de começar, para ver o que falta.
+
+## Problemas comuns
+
+| Situação | O que fazer |
+|---|---|
+| `erro: faltam SUPABASE_URL e SUPABASE_SECRET_KEY` | o arquivo `.env` não está na pasta do projeto ou está incompleto |
+| "Código incorreto" no CAPTCHA | digite de novo; Enter vazio troca a imagem |
+| A captura parou no meio | rode o mesmo comando: as páginas voltaram para a fila e as imagens que sobraram em `data/tmp/` são lidas primeiro |
+| Página com status `erro` de OCR | a imagem está em `data/falhas_ocr/`; teste com `reprocessar --pasta data/falhas_ocr` |
+| A captura está lenta | é o OCR; páginas densas levam mais de um minuto |
+| O `anuncios` não acha uma página | a imagem não foi guardada; capture com `--guardar-imagens` |
+| O computador ficou sem espaço | as imagens de `data/amostra/` ocupam ~3,5 MB cada. Só apague as que não for mais separar em anúncios: hoje o `anuncios` precisa da imagem para encontrar a página (isso muda com a atividade 3.1 do planejamento) |
+
+## Limites que convém conhecer
+
+- **O OCR erra letras**, principalmente nas páginas densas de 1850 a 1880, e às vezes pula uma linha encostada numa régua.
+- **A extração de campos também é heurística** (veja o passo 8): confira por amostra.
+- **A separação de anúncios é heurística:** pode juntar dois anúncios vizinhos ou partir um em dois. As imagens de depuração mostram onde.
+- **A busca da HDB conta páginas, não anúncios,** e só acha o que o OCR da própria BN leu certo.
+- **Uso responsável:** a ferramenta faz uma pausa fixa entre requisições, para não sobrecarregar a Biblioteca Nacional, e nunca contorna o CAPTCHA. Não reduza essas pausas.
+
+## Termos usados neste guia
+
+| Termo | Significado |
+|---|---|
+| **acervo** (`bib`) | um jornal num intervalo de anos, ex.: `364568_04` = Jornal do Commercio, 1850–1859 |
+| **página física** | o número da página dentro do acervo (não é o número impresso no jornal) |
+| **ocorrência** | uma página encontrada por um termo na busca |
+| **OCR** | programa que lê o texto de uma imagem |
+| **CAPTCHA** | código de imagem que o site pede para provar que há uma pessoa |
+| **segmento** | um pedaço de linha dentro de uma coluna |
+| **anúncio `largo`** | anúncio que provavelmente pega texto de mais de uma coluna |
+| **versão** (`v1`, `v2`) | qual regra de separação de anúncios gerou aquele resultado |
+| **corpus** | o conjunto final de anúncios que vai para a análise |
+| **modelagem de tópicos** | técnica que agrupa textos por temas que se repetem |

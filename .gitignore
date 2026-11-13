@@ -1,0 +1,17 @@
+# segredo: a chave do Supabase. Nunca subir.
+.env
+
+# dados locais (imagens, cache do OCR, logs): ficam no computador de quem capturou; o texto vai para o banco
+data/
+
+# ambiente e arquivos gerados
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+
+# configurações locais de ferramentas
+.claude/settings.local.json
+.agents/
+skills-lock.json
