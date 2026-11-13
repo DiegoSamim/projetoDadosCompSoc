@@ -1,0 +1,14 @@
+requests
+beautifulsoup4
+lxml
+pandas
+matplotlib
+ipykernel
+pytest
+# captura, OCR e banco
+playwright
+opencv-python-headless
+pytesseract
+jiwer
+supabase==2.34.1
+python-dotenv==1.2.4
