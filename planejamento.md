@@ -31,6 +31,90 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 
 ---
 
+## Situação em 23/11 e plano para terminar hoje
+
+### O que os dados mostram
+
+| | Hoje | Meta |
+|---|---|---|
+| Páginas capturadas da amostra | **49 de 69** (todas por uma pessoa do grupo, desde 20/11) | 69 |
+| Páginas com anúncios separados | **39 de 88** capturadas | todas |
+| Anúncios de pessoas escravizadas (tipo ≠ outro) | **347** | pelo menos 100 por período legal |
+
+**Anúncios relevantes por período (só as 39 páginas separadas):**
+
+| Período | Páginas | Relevantes | Fuga | Venda | Aluguel | Ama de leite | Compra |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| antes de 1831 | 10 | **28** | 28 | 0 | 0 | 0 | 0 |
+| 1831–1850 | 10 | 136 | 26 | 54 | 35 | 18 | 3 |
+| 1850–1871 | 13 | 158 | 32 | 38 | 68 | 18 | 2 |
+| 1871–1888 | 6 | **25** | 18 | 4 | 3 | 0 | 0 |
+
+**O que isso quer dizer:**
+
+1. **Falta separar os anúncios de 49 páginas.** São exatamente as páginas novas (JC 1827–29, JC 1830s e 16 do JC 1860s). A separação precisa da **imagem**, e as imagens estão no computador de quem capturou. Hoje só o texto foi para o banco, e o texto sozinho não dá as posições das palavras. **É o maior gargalo e destrava quase tudo.** Por isso a atividade 3.1 ("anúncios dentro da captura") passa a ser a primeira.
+2. **Os extremos estão fracos.** "Antes de 1831" só tem fuga (e do Diário do RJ e do Diário Fluminense, não do Jornal do Commercio); "1871–1888" tem só 25 anúncios.
+3. **A densidade cai nas décadas tardias.** Nos anos 1840 e 1850 saem de 15 a 19 anúncios relevantes por página. Nos anos 1860 e 1880, cerca de 4 por página, porque a letra é miúda, o OCR é pior (confiança de 56 a 66, contra 75 a 84 nos anos 1830) e há muito aviso não relacionado. Para chegar a 100 anúncios nesses períodos, são necessárias umas 25 páginas, e não 18.
+4. **O mesmo anúncio se repete.** O jornal publicava o anúncio de fuga do "preto Thomé" em várias edições, e ele entrou duas vezes na tabela. Sem tratar isso, a modelagem de tópicos vai achar "um tópico" que é só um anúncio repetido.
+5. **Em páginas de letra grande, o título se separa do corpo** ("ESCRAVO FUGIDO," virou um anúncio sozinho) e o texto continua na coluna seguinte. Isso gera fragmentos curtos.
+6. **A captura em si vai bem:** 49 páginas em cerca de 63 s cada, 9 CAPTCHAs (uma página de cada 5). Houve 2 falhas por esperar o CAPTCHA por 10 minutos sem ninguém digitar.
+
+### O que fazer hoje, em ordem
+
+**Bloco 1: destravar (primeira hora)**
+
+| # | Quem | O quê | Pronto quando |
+|---|---|---|---|
+| 1 | **Quem capturou as 49 páginas** | `git pull`, depois `hdb anuncios` e `hdb campos` no computador com as imagens (`data/amostra/`). É a saída imediata, sem código novo. | `situacao` e a consulta por período mostram anúncios nas páginas de 364568_01, _02 e _05 |
+| 2 | **Pessoa 1** | Em paralelo, **3.1**: a captura passa a separar os anúncios na hora e a guardar as posições das palavras no banco. Assim ninguém depende das imagens de outra pessoa, nem depois de melhorar a separação. | uma captura nova já sai com anúncios; `hdb anuncios` refaz a separação a partir do banco |
+| 3 | **Pessoa 1** | Liberar as reservas travadas e refazer as 2 páginas com CAPTCHA esgotado (`hdb status` mostra). | nenhuma página reservada há mais de 30 min |
+
+**Bloco 2: completar e equilibrar os dados (meio do dia)**
+
+| # | Quem | O quê | Pronto quando |
+|---|---|---|---|
+| 4 | **Pessoa 1** | Terminar o período 1871–1888: `capturar --pessoa 1` (faltam as 18 páginas) | `situacao --pessoa 1` mostra 18 de 18 |
+| 5 | **Pessoa 3** | Terminar a compra de 1850–1871 (faltam 2 páginas) | `situacao --pessoa 3` mostra 18 de 18 |
+| 6 | **Quem estiver livre** | **Páginas extras** onde os dados são fracos (tabela abaixo). Só depois da separação do bloco 1, para ver quanto cada período já tem. | cada período tem pelo menos 100 anúncios relevantes |
+
+**Páginas extras (só se, depois do bloco 1, o período ficar abaixo de 100 anúncios relevantes).** São cerca de 20 páginas a mais, 4 CAPTCHAs:
+
+| Período | Acervo | Termo | Páginas extras |
+|---|---|---|---:|
+| 1871–1888 | JC 1880s (`364568_07`) | `"escrav* fugid*"` | 8 |
+| 1871–1888 | JC 1870s (`364568_06`) | `"vende-se uma preta"` e `"preta com leite"` | 4 + 4 |
+| antes de 1831 | JC 1827–29 (`364568_01`) | `"escravos fugidos"` | 4 (fuga que ainda é só do Diário do RJ) |
+
+Essas linhas entram em `scripts/amostra.py` como novas células, e os comandos são os mesmos.
+
+**Bloco 3: categorizar (tarde)**
+
+| # | Quem | O quê | Pronto quando |
+|---|---|---|---|
+| 7 | **Pessoa 1** | **Tirar duplicatas** (anúncios repetidos entre edições): comparar textos parecidos e manter um por grupo, guardando quantas vezes saiu. Também juntar fragmentos de título em página de letra grande. | o anúncio do "preto Thomé" aparece uma vez |
+| 8 | **Pessoa 1** | `hdb campos` em todos os anúncios (versão `c2`) | o resumo mostra os 5 tipos em todos os períodos |
+| 9 | **Pessoas 1, 2 e 3** | **Conferir 10 anúncios** do próprio período (15 min) e anotar os erros de tipo, de sexo e de anúncios grudados | anotações entregues; se o tipo estiver certo em 8 de 10, seguimos |
+| 10 | **Pessoa 2** | Lista de grafias da época (`hum`→`um`…) | ~50 trocas entregues |
+| 11 | **Pessoa 3** | Lista de palavras vazias (`rua`, `casa`, `trata`…) | ~50 palavras entregues |
+
+**Bloco 4: analisar e fechar a ferramenta (próximos dias)**
+
+| # | Quem | O quê |
+|---|---|---|
+| 12 | **Pessoa 1** | `hdb corpus` (filtro, corte de qualidade, texto padronizado) e `hdb topicos` (LDA, de 6 a 10 tópicos) |
+| 13 | **Pessoas 1, 2 e 3** | Nomear os tópicos do próprio período, comparar entre períodos e por sexo e idade |
+| 14 | **Pessoa 1** | `hdb relatorio`, contextualização e slides |
+
+**Para "terminar hoje", o corte é:** blocos 1 e 2 completos, e o bloco 3 com as duplicatas tratadas e as conferências feitas. Os blocos 3 (listas) e 4 começam em seguida.
+
+### Riscos de hoje
+
+- **O dado de 1871–1888 é o mais fraco** (letra miúda e OCR ruim). Se, mesmo com as páginas extras, ele ficar abaixo de 100, comparamos esse período com ressalva, dizendo que tem menos anúncios.
+- **Se a separação das 49 páginas der muito ruído** (como nas páginas de letra grande dos anos 1860), ela entra na lista de correções antes do `hdb corpus`.
+- **Um CAPTCHA parado trava a captura por 10 minutos.** Quem captura deve ficar com o terminal à vista.
+
+---
+
 ## Quem faz o quê
 
 Cada pessoa fica com um ou dois **períodos legais**. Ela coleta os anúncios do seu período, estuda as leis dele e apresenta os resultados dele. A Pessoa 1 cuida também da ferramenta.
@@ -146,10 +230,10 @@ Fase final: nomear tópicos, contextualizar, slides (todos)
 ## O que já está pronto
 
 - **Busca na HDB:** termos contados, frases escolhidas e panorama do RJ 1850–1859 feito (o Jornal do Commercio é o jornal certo).
-- **Captura com CAPTCHA por pessoa:** OCR local e banco compartilhado sem retrabalho. 39 páginas já estão no banco.
-- **Separação dos anúncios:** 3.796 anúncios, 347 deles de pessoas escravizadas.
+- **Captura com CAPTCHA por pessoa:** OCR local e banco compartilhado sem retrabalho. **88 páginas** no banco (49 da amostra, capturadas por uma pessoa do grupo desde 20/11, e 39 anteriores).
+- **Separação dos anúncios:** 3.796 anúncios em 39 páginas, 347 deles de pessoas escravizadas. **Faltam as 49 páginas novas** (ver "Situação em 23/11").
 - **Extração de campos:** tipo, sexo, idade, nação, nome, recompensa e período legal.
-- **Relatório metodológico, notebook didático e script da amostra.**
+- **Relatório metodológico, notebook didático, script da amostra (com `--pessoa`) e repositório no GitHub.**
 - **286 testes automáticos.**
 
 ## Riscos
