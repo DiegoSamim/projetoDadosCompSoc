@@ -8,6 +8,8 @@ O plano e o porquê de cada escolha estão em termos_busca.md (seção "O que va
     PYTHONPATH=src .venv/bin/python scripts/amostra.py capturar --pessoa 2     # precisa de uma pessoa para o CAPTCHA
 
 `--pessoa 1|2|3` limita às células daquela pessoa (divisão em planejamento.md); sem ele, vale a amostra inteira.
+`--extras` troca a amostra pela lista EXTRAS (dados a mais, para os períodos fracos). O `capturar` sem `--extras`
+nunca pega as páginas extras, então quem só captura a amostra não é atrapalhado.
 
 Tudo é retomável: rodar de novo continua de onde parou e não repete páginas.
 """
@@ -23,6 +25,7 @@ from hdb.banco import BancoSupabase  # noqa: E402
 from hdb.busca import coletar_ocorrencias, nova_sessao  # noqa: E402
 
 LISTAR_NO_MAXIMO = 200  # ocorrências listadas por célula (a lista sai em ordem de data)
+LISTAR_EXTRAS = 60      # nas células extras, menos: só precisamos de poucas páginas
 
 # (período legal, tipo, bib, acervo, termo, páginas a capturar)
 AMOSTRA = [
@@ -48,13 +51,32 @@ AMOSTRA = [
     ("1871–1888",     "compra",       "364568_06", "JC 1870s",   '"compra-se escravos"',   2),
 ]
 
+# Dados a mais, fora da amostra principal: reforçam 1871–1888 (só 25 anúncios) e "antes de 1831" (só fuga).
+# O Diário do RJ (094170_01) tem OCR rápido (cerca de 6 s por página) e, na ordem de data, as primeiras páginas
+# são de 1821 em diante, ou seja, "antes de 1831". Termos "Contexto" servem para ligar os anúncios às leis.
+EXTRAS = [
+    ("1871–1888",     "fuga",         "364568_06", "JC 1870s",   '"escravo fugido"',       5),
+    ("1871–1888",     "fuga",         "364568_06", "JC 1870s",   '"escrava fugida"',       3),
+    ("1871–1888",     "fuga",         "364568_07", "JC 1880s",   '"escravo fugido"',       5),
+    ("1871–1888",     "fuga",         "364568_07", "JC 1880s",   '"escrava fugida"',       3),
+    ("1871–1888",     "contexto",     "364568_06", "JC 1870s",   'ingenuo',                3),
+    ("1871–1888",     "contexto",     "364568_07", "JC 1880s",   'sexagenario',            3),
+    ("antes de 1831", "venda",        "094170_01", "DRJ 1821–58", '"vende-se uma preta"',  4),
+    ("antes de 1831", "venda",        "094170_01", "DRJ 1821–58", '"vende-se um preto"',   4),
+    ("antes de 1831", "aluguel",      "094170_01", "DRJ 1821–58", '"aluga-se uma preta"',  4),
+    ("antes de 1831", "aluguel",      "094170_01", "DRJ 1821–58", '"aluga-se um preto"',   3),
+    ("antes de 1831", "ama de leite", "094170_01", "DRJ 1821–58", '"preta com leite"',     4),
+    ("antes de 1831", "fuga",         "094170_01", "DRJ 1821–58", '"fugio um escravo"',    4),
+    ("antes de 1831", "compra",       "094170_01", "DRJ 1821–58", '"compra-se um preto"',  2),
+]
+
 # quem fica com cada período (planejamento.md, "Quem faz o quê")
 PESSOAS = {1: ["1871–1888"], 2: ["antes de 1831", "1831–1850"], 3: ["1850–1871"]}
 
 
-def celulas(pessoa=None):
-    """As células da amostra, ou só as da pessoa."""
-    return [c for c in AMOSTRA if pessoa is None or c[0] in PESSOAS[pessoa]]
+def celulas(pessoa=None, extras=False):
+    """As células da amostra (ou das EXTRAS), ou só as da pessoa."""
+    return [c for c in (EXTRAS if extras else AMOSTRA) if pessoa is None or c[0] in PESSOAS[pessoa]]
 
 
 def andamento(banco):
@@ -66,31 +88,32 @@ def andamento(banco):
     return feito
 
 
-def situacao(banco, pessoa=None):
+def situacao(banco, pessoa=None, extras=False):
     feito = andamento(banco)
     print(f"{'período':14} {'tipo':13} {'acervo':11} {'termo':24} {'listadas':>9} {'capturadas':>11}")
     total_ok = total_meta = 0
-    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa):
+    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras):
         f = feito.get((bib, termo), {})
         ok = min(f.get("ok", 0), meta)
         total_ok, total_meta = total_ok + ok, total_meta + meta
         listadas = f"{f['listadas']}/{f['total']}" if f else "—"
         print(f"{periodo:14} {tipo:13} {acervo:11} {termo:24} {listadas:>9} {f.get('ok', 0):>5} de {meta}")
-    print(f"\nCapturadas: {total_ok} de {total_meta} páginas da amostra.")
+    print(f"\nCapturadas: {total_ok} de {total_meta} páginas {'extras' if extras else 'da amostra'}.")
 
 
-def listar(banco, pessoa=None):
+def listar(banco, pessoa=None, extras=False):
     sessao = nova_sessao()
-    for periodo, tipo, bib, acervo, termo, _ in celulas(pessoa):
-        salvas, total = coletar_ocorrencias(sessao, bib, termo, banco, limite=LISTAR_NO_MAXIMO)
+    limite = LISTAR_EXTRAS if extras else LISTAR_NO_MAXIMO
+    for periodo, tipo, bib, acervo, termo, _ in celulas(pessoa, extras):
+        salvas, total = coletar_ocorrencias(sessao, bib, termo, banco, limite=limite)
         print(f"{periodo:14} {tipo:13} {acervo:11} {termo:24} {salvas} listadas de {total}", flush=True)
 
 
-def capturar(banco, quem, modo, pessoa=None):
+def capturar(banco, quem, modo, pessoa=None, extras=False):
     from hdb.captura import capturar as capturar_paginas
 
     feito = andamento(banco)
-    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa):
+    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras):
         falta = meta - feito.get((bib, termo), {}).get("ok", 0)
         if falta <= 0:
             continue
@@ -106,14 +129,15 @@ def main():
     p.add_argument("--quem", default=getpass.getuser(), help="quem captura (padrão: usuário do sistema)")
     p.add_argument("--modo", choices=["terminal", "janela"], default="terminal",
                    help="onde a pessoa resolve o CAPTCHA (padrão: terminal)")
+    p.add_argument("--extras", action="store_true", help="usa a lista EXTRAS (dados a mais) em vez da amostra")
     p.add_argument("--pessoa", type=int, choices=sorted(PESSOAS), help="só as células desta pessoa")
     args = p.parse_args()
     banco = BancoSupabase()
     if args.etapa == "listar":
-        listar(banco, args.pessoa)
+        listar(banco, args.pessoa, args.extras)
     elif args.etapa == "capturar":
-        capturar(banco, args.quem, args.modo, args.pessoa)
-    situacao(banco, args.pessoa)
+        capturar(banco, args.quem, args.modo, args.pessoa, args.extras)
+    situacao(banco, args.pessoa, args.extras)
 
 
 if __name__ == "__main__":
