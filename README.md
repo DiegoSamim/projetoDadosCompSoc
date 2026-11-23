@@ -2,6 +2,7 @@
 
 Contexto e objetivos: [projeto.md](projeto.md). Notas da reunião: [contexto.md](contexto.md).
 **O que vamos buscar** (a amostra do grupo) e quantas páginas há para cada termo: [termos_busca.md](termos_busca.md). Script da amostra: `scripts/amostra.py`.
+Quer só ajudar a capturar? [tutorial_captura.md](tutorial_captura.md).
 O que já foi feito e o que falta: [planejamento.md](planejamento.md). Como usar a ferramenta: [guia_ferramenta.md](guia_ferramenta.md). Explicação passo a passo, com exemplo de 10 anúncios: [notebooks/como_funciona.ipynb](notebooks/como_funciona.ipynb).
 Como funciona a parte de linguagem natural (limpeza do texto e modelagem de tópicos): [linguagem_natural.md](linguagem_natural.md).
 
