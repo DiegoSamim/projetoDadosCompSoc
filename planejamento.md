@@ -2,245 +2,222 @@
 
 **Objetivo:** reunir algumas centenas de anúncios de pessoas escravizadas do Jornal do Commercio (RJ), de antes de 1831 até 1888, encontrar os **temas** que se repetem neles (modelagem de tópicos) e comparar esses temas entre os períodos das leis de 1831, 1850, 1871, 1885 e 1888.
 
-Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes termos) · [guia_ferramenta.md](guia_ferramenta.md) (como usar cada comando) · [linguagem_natural.md](linguagem_natural.md) (como funcionam os tópicos) · [notebooks/como_funciona.ipynb](notebooks/como_funciona.ipynb) (exemplo com dados reais).
+Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes termos) · [guia_ferramenta.md](guia_ferramenta.md) (cada comando) · [linguagem_natural.md](linguagem_natural.md) (como funcionam os tópicos) · notebooks em [notebooks/](notebooks/) · [relatório metodológico](relatorios/).
+
+**Atualizado em 24/11/2026.** Este documento tem três partes: o que está **feito**, o que **falta** e as **melhorias** possíveis.
 
 ---
 
-## O que vamos usar (decidido)
+## Em cinco linhas
+
+1. A coleta fechou: **158 páginas** no banco, a amostra planejada está **completa (69 de 69)**, mais os extras.
+2. **Faltam separar 49 páginas** em anúncios, e isso só pode ser feito no computador de quem as capturou.
+3. A ferramenta já faz tudo, da captura aos **tópicos (LDA)**, e os 3 notebooks rodam com dados reais.
+4. O resultado atual é **provisório**: 655 anúncios no corpus, 4 temas estáveis e 2 de ruído. Os números mudam quando as 49 páginas entrarem.
+5. O que falta é sobretudo **trabalho do grupo**: conferir anúncios, nomear tópicos, contextualizar e montar os slides.
+
+---
+
+## Decisões (não mudam)
 
 | Item | Decisão |
 |---|---|
-| **Fonte** | Hemeroteca Digital Brasileira, `memoria.bn.gov.br` |
-| **Jornal** | Jornal do Commercio (RJ), um acervo por período |
-| **Tipos de anúncio** | fuga, venda, aluguel, ama de leite, compra |
-| **Termos** | 1 frase por tipo e período: 20 "células" (tabela abaixo), guardadas em `scripts/amostra.py` |
-| **Tamanho** | 69 páginas novas, mais as 39 que já estão no banco, para algumas centenas de anúncios |
-| **Ferramenta** | `hdb` + `scripts/amostra.py`; tudo fica no banco (Supabase), sem exportar arquivos |
-| **Texto** | OCR com Tesseract (já funciona); nada é transcrito à mão |
-| **Técnica de tópicos** | **LDA** (`scikit-learn`), um modelo para todos os anúncios, de 6 a 10 tópicos; o período entra na comparação |
-| **Comparação** | % de cada tópico por período legal, e por sexo e idade (campos já extraídos) |
-
-**Fora do escopo:**
-
-- capturar milhares de páginas;
-- outros jornais e estados;
-- transcrição ou rotulagem à mão;
-- exportar CSV ou JSON;
-- BERTopic (só se sobrar tempo no fim);
-- melhorias finas do OCR.
+| Fonte | Hemeroteca Digital Brasileira, `memoria.bn.gov.br` |
+| Jornal | Jornal do Commercio (RJ), um acervo por período; antes de 1831, Diário do RJ e Diário Fluminense |
+| Tipos | fuga, venda, aluguel, ama de leite, compra |
+| Texto | OCR com Tesseract; nada é transcrito à mão |
+| Técnica | **LDA** (`scikit-learn`), um modelo para todos os anúncios; o período entra na comparação |
+| Comparação | % de cada tópico por período legal, por sexo, idade e tipo |
+| Fora do escopo | milhares de páginas, outros estados, rotulagem à mão, exportar CSV/JSON, melhorias finas do OCR |
 
 ---
 
-## Situação em 23/11 e plano para terminar hoje
+## Parte 1: O que está feito
 
-### O que os dados mostram (atualizado em 24/11, depois da segmentação e do `c3`)
+### Os dados (24/11)
 
-| | Hoje | Meta |
+| | Hoje |
+|---|---|
+| Páginas capturadas | **158** (amostra principal 69 de 69, Diário do RJ e extras) |
+| Páginas com anúncios separados | **109** (faltam 49) |
+| Anúncios separados | 11.612 |
+| Anúncios de pessoas escravizadas (campos `c4`) | **701**, e mais **67** `aluguel_incerto` fora do corpus |
+| Corpus para o LDA (`corp2`) | **655** |
+
+| Período | No corpus | Fuga | Venda | Aluguel | Ama de leite | Compra |
+|---|---:|---:|---:|---:|---:|---:|
+| antes de 1831 | 102 | 59 | 24 | 7 | 12 | 0 |
+| 1831–1850 | 134 | 26 | 50 | 33 | 20 | 5 |
+| 1850–1871 | 192 | 43 | 54 | 70 | 23 | 2 |
+| 1871–1888 | 227 | 41 | 56 | 115 | 13 | 2 |
+| **Total** | **655** | 169 | 184 | 225 | 68 | 9 |
+
+Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúncios vêm do Diário do RJ (101 de 106 na rodada anterior).
+
+### A ferramenta (`hdb`, 325 testes)
+
+| Etapa | Comando | Situação |
 |---|---|---|
-| Páginas capturadas (amostra completa: **69 de 69**) | **158** | amostra + extras + complemento |
-| Páginas com anúncios separados | **109 de 158** (faltam 49, só na outra máquina) | todas |
-| Anúncios de pessoas escravizadas (tipo ≠ outro, campos `c3`) | **768** | pelo menos 100 por período legal |
-| Anúncios no corpus (`hdb corpus`, versão `corp1`) | **717** | |
+| Contar e escolher termos | `hdb buscar`, `hdb acervos`, `hdb panorama` | pronto; 134 termos contados |
+| Capturar página (CAPTCHA por pessoa) e OCR | `hdb capturar`, `scripts/amostra.py` | pronto; ~63 s por página |
+| Separar anúncios | `hdb anuncios` (agora pula o que já foi feito; `--refazer`) | pronto, versão `v2` |
+| Extrair campos | `hdb campos` | pronto, versão **`c4`** |
+| Corpus padronizado | `hdb corpus` | pronto, versão **`corp2`** |
+| Modelagem de tópicos | `hdb topicos` | pronto; `t2` (k=8) e `t3` (k=6) gravados |
+| Estabilidade do LDA | `scripts/estabilidade_topicos.py` | pronto |
+| Relatório metodológico | `hdb relatorio` | pronto; seção de limites ampliada |
 
-**Anúncios relevantes por período (campos `c3`):**
+### O que cada versão corrigiu
 
-| Período | Relevantes | Fuga | Venda | Aluguel | Ama de leite | Compra | Situação |
-|---|---:|---:|---:|---:|---:|---:|---|
-| antes de 1831 | **106** | 63 | 24 | 7 | 12 | 0 | ok em volume; 15 páginas do JC 1827–29 ainda sem separar |
-| 1831–1850 | 136 | 26 | 50 | 35 | 20 | 5 | ok (18 páginas do JC 1830s ainda sem separar) |
-| 1850–1871 | 220 | 52 | 54 | 89 | 23 | 2 | ok (16 páginas do JC 1860s ainda sem separar) |
-| 1871–1888 | 306 | 48 | 60 | **181** | 13 | 4 | ok em volume; **aluguel ainda a conferir** |
+| Versão | Problema que resolveu |
+|---|---|
+| `c3` | aluguel, venda e compra só com palavra de pessoa; sala, casa e "senhora portuguesa" saem |
+| `c4` | aluguel só vale com marca de escravizado (preto, pardo, moleque…); "criada" e "rapariga" viram `aluguel_incerto`; o anúncio colado ao vizinho deixa de contaminar a regra. Em 10 aluguéis de 1871–1888 sorteados, **9 de 10 eram de pessoas escravizadas** (antes, cerca de 4). |
+| `corp2` | erros de OCR unificados (`luga`→`aluga`, `recisa`→`precisa`); nomes próprios e loteria fora; `aluguel_incerto` fora |
 
-**O que isso quer dizer:**
+### Os notebooks
 
-1. **A separação das 49 páginas restantes continua pendente** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). A separação precisa da imagem, e essas imagens estão no computador de quem capturou. É o que mais muda os números, sobretudo "antes de 1831".
-2. **Corrigi uma estimativa:** eu tinha previsto cerca de 4 anúncios por página nos anos 1870. A medida real é **18 por página** (325 anúncios em 18 páginas). Os anos 1860 e 1880 continuam baixos (cerca de 4 por página), então a baixa densidade não é regra das décadas tardias.
-3. **Anúncios repetidos são raros nesta amostra:** só cerca de 0,5% repetem o início do texto. O risco existe, mas é pequeno enquanto as páginas forem sorteadas. Tratar duplicatas deixa de ser urgente.
-4. **Pendências de qualidade:** 201 "aluguéis" em 1871–1888 é um número alto e **não foi conferido**; pode haver anúncios de aluguel de outra coisa classificados como de pessoas. Também há 56 anúncios com menos de 60 caracteres (fragmentos).
-5. **A captura vai bem:** cerca de 63 s por página, uma página de cada 5 com CAPTCHA.
+| Notebook | O que mostra |
+|---|---|
+| [como_funciona.ipynb](notebooks/como_funciona.ipynb) | o caminho inteiro, do jornal ao anúncio |
+| [analise_descritiva.ipynb](notebooks/analise_descritiva.ipynb) | tipo, sexo, idade, nação, recompensa e densidade por período |
+| [topicos_por_periodo.ipynb](notebooks/topicos_por_periodo.ipynb) | os tópicos por período, sexo, idade e tipo |
 
-### O que fazer hoje, em ordem
+### Os resultados provisórios
 
-**Bloco 1: destravar (primeira hora)**
+**Estabilidade (10 sementes por k):** k=4 repete 50% dos tópicos; **k=6, 52%**; k=8, 43%; k=12, 21%. Usamos o **k=6** como principal e o k=8 como comparação.
 
-| # | Quem | O quê | Pronto quando |
+**Temas que se repetem em todas as sementes:** aluguel de trabalho doméstico, fuga em geral, fuga com descrição do corpo e das roupas, ama de leite. **Temas fracos:** avisos oficiais e de navegação, venda ou ação judicial, e um tópico vago.
+
+| O que os números mostram (`t3`, 655 anúncios) | antes de 1831 | 1831–50 | 1850–71 | 1871–88 |
+|---|---:|---:|---:|---:|
+| Tópico de aluguel doméstico | 7,7% | 18,4% | 27,6% | **38,6%** |
+| Tópico de fuga descrita | **25,8%** | n/d | n/d | 6,5% |
+| Fuga com recompensa (de 189 fugas) | 52% | 62% | 19% | 10% |
+
+**Cuidado com a leitura:** a fuga é 58% dos anúncios antes de 1831 e 18% em 1871–1888. Parte da mudança vem do que as frases de busca acharam em cada período.
+
+---
+
+## Parte 2: O que falta
+
+### A. Dados (mais urgente)
+
+| # | Tarefa | Quem | Tempo | Depende de | Pronto quando |
+|---|---|---|---|---|---|
+| A1 | **Separar as 49 páginas** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). `git pull`, depois `hdb anuncios` e `hdb campos`, **sem apagar `data/amostra/`** | quem capturou essas páginas | ~1 h | as imagens existirem na máquina dele | nenhuma página com texto sem anúncios |
+| A2 | **Cobrir 1886–1888**: listar mais páginas de `"escrav* fugid*"` no JC 1880s (hoje só há 1880, 1881 e 1885) e capturar uma amostra sorteada por ano | Diego (listar) e quem captura | listar ~1 h; capturar ~8 páginas, 2 CAPTCHAs | nada | existem anúncios dos anos 1886, 1887 e 1888 |
+| A3 | **Complemento** (91 páginas, `--complemento`): verificar quanto já foi capturado | quem capturou | — | — | `scripts/amostra.py situacao` mostra o andamento |
+| A4 | **Plano B, se as imagens da A1 sumiram:** a captura passa a guardar as palavras no banco (atividade 3.1). As 49 páginas precisariam ser recapturadas, com CAPTCHA | Claude implementa; grupo recaptura | meio dia + ~1 h | falha da A1 | `hdb anuncios` refaz a separação a partir do banco |
+
+### B. Qualidade
+
+| # | Tarefa | Quem | Pronto quando |
 |---|---|---|---|
-| 1 | **Quem capturou as 49 páginas** | `git pull`, depois `hdb anuncios` e `hdb campos` no computador com as imagens (`data/amostra/`). É a saída imediata, sem código novo. | `situacao` e a consulta por período mostram anúncios nas páginas de 364568_01, _02 e _05 |
-| 2 | **Pessoa 1** | Em paralelo, **3.1**: a captura passa a separar os anúncios na hora e a guardar as posições das palavras no banco. Assim ninguém depende das imagens de outra pessoa, nem depois de melhorar a separação. | uma captura nova já sai com anúncios; `hdb anuncios` refaz a separação a partir do banco |
-| 3 | **Pessoa 1** | Liberar as reservas travadas e refazer as 2 páginas com CAPTCHA esgotado (`hdb status` mostra). | nenhuma página reservada há mais de 30 min |
+| B1 | **Conferir 10 anúncios por período** (15 min cada) e anotar erros de tipo, sexo e anúncios colados | as 3 pessoas | se o tipo estiver certo em 8 de 10, seguimos; senão, nova versão de `campos` |
+| B2 | **Decidir o que fazer com os 67 `aluguel_incerto`**: ficam de fora do corpus (hoje), entram como tipo à parte, ou entram só se tiverem cor | grupo | decisão registrada no relatório |
+| B3 | **Filtrar o ruído que sobrou**: avisos de navegação e juízo (tópico 5), banhos medicinais passando como fuga, colunas inteiras de classificados | Claude | os tópicos de ruído somem ou ficam isolados |
+| B4 | **Anúncios colados**: usar o travessão como divisor (separação v3) | Claude | os anúncios do exemplo 5941 saem separados |
+| B5 | **56 fragmentos** com menos de 60 caracteres | Claude | juntados ao anúncio vizinho ou descartados |
 
-**Bloco 2: completar e equilibrar os dados (meio do dia)**
+### C. Análise e apresentação (trabalho do grupo)
 
-| # | Quem | O quê | Pronto quando |
+| # | Tarefa | Quem | Depende de |
 |---|---|---|---|
-| 4 | **Pessoa 1** | Terminar o período 1871–1888: `capturar --pessoa 1` (faltam as 18 páginas) | `situacao --pessoa 1` mostra 18 de 18 |
-| 5 | **Pessoa 3** | Terminar a compra de 1850–1871 (faltam 2 páginas) | `situacao --pessoa 3` mostra 18 de 18 |
-| 6 | **Quem estiver livre** | **Páginas extras** onde os dados são fracos (tabela abaixo). Só depois da separação do bloco 1, para ver quanto cada período já tem. | cada período tem pelo menos 100 anúncios relevantes |
+| C1 | **Repetir a sequência com as 49 páginas novas:** `hdb corpus`, `hdb topicos`, estabilidade, notebooks e relatório | Claude (~15 min) | A1 |
+| C2 | **Nomear os tópicos.** Os nomes do notebook são só sugestão. Ler as palavras e uns 5 anúncios de cada um | as 3 pessoas | C1 |
+| C3 | **Contextualização histórica** das leis do próprio período, com a dissertação indicada pela Fernanda | as 3 pessoas | — |
+| C4 | **De 2 a 3 slides por período**: tópicos, exemplos de anúncios, contexto | as 3 pessoas | C2 e C3 |
+| C5 | **Montar a apresentação** e gerar o relatório final (`hdb relatorio`) | Pessoa 1 | C4 |
 
-**Páginas extras (só se, depois do bloco 1, o período ficar abaixo de 100 anúncios relevantes).** São cerca de 20 páginas a mais, 4 CAPTCHAs:
+### D. Documentação e organização
 
-| Período | Acervo | Termo | Páginas extras |
-|---|---|---|---:|
-| 1871–1888 | JC 1880s (`364568_07`) | `"escrav* fugid*"` | 8 |
-| 1871–1888 | JC 1870s (`364568_06`) | `"vende-se uma preta"` e `"preta com leite"` | 4 + 4 |
-| antes de 1831 | JC 1827–29 (`364568_01`) | `"escravos fugidos"` | 4 (fuga que ainda é só do Diário do RJ) |
-
-Essas linhas entram em `scripts/amostra.py` como novas células, e os comandos são os mesmos.
-
-**Bloco 3: categorizar (tarde)**
-
-| # | Quem | O quê | Pronto quando |
-|---|---|---|---|
-| 7 | **Pessoa 1** | **Tirar duplicatas** (anúncios repetidos entre edições): comparar textos parecidos e manter um por grupo, guardando quantas vezes saiu. Também juntar fragmentos de título em página de letra grande. | o anúncio do "preto Thomé" aparece uma vez |
-| 8 | **Pessoa 1** | `hdb campos` em todos os anúncios (versão `c2`) | o resumo mostra os 5 tipos em todos os períodos |
-| 9 | **Pessoas 1, 2 e 3** | **Conferir 10 anúncios** do próprio período (15 min) e anotar os erros de tipo, de sexo e de anúncios grudados | anotações entregues; se o tipo estiver certo em 8 de 10, seguimos |
-| 10 | **Pessoa 2** | Lista de grafias da época (`hum`→`um`…) | ~50 trocas entregues |
-| 11 | **Pessoa 3** | Lista de palavras vazias (`rua`, `casa`, `trata`…) | ~50 palavras entregues |
-
-**Bloco 4: analisar e fechar a ferramenta (próximos dias)**
-
-| # | Quem | O quê |
+| # | Tarefa | Quem |
 |---|---|---|
-| 12 | **Pessoa 1** | `hdb corpus` (filtro, corte de qualidade, texto padronizado) e `hdb topicos` (LDA, de 6 a 10 tópicos) |
-| 13 | **Pessoas 1, 2 e 3** | Nomear os tópicos do próprio período, comparar entre períodos e por sexo e idade |
-| 14 | **Pessoa 1** | `hdb relatorio`, contextualização e slides |
+| D1 | Atualizar [guia_ferramenta.md](guia_ferramenta.md) e [linguagem_natural.md](linguagem_natural.md) com `corpus`, `topicos`, `c4`, `aluguel_incerto` e `--refazer` | Claude |
+| D2 | Atualizar a tabela de situação do [README](README.md) e de [projeto.md](projeto.md) | Claude |
+| D3 | Tutorial de captura: a edição local do Diego (sem o passo do `.env`) ainda não foi commitada | Diego decide |
+| D4 | Confirmar com o professor a data da apresentação | Diego |
 
-**Para "terminar hoje", o corte é:** blocos 1 e 2 completos, e o bloco 3 com as duplicatas tratadas e as conferências feitas. Os blocos 3 (listas) e 4 começam em seguida.
-
-### Riscos de hoje
-
-- **O dado de 1871–1888 é o mais fraco** (letra miúda e OCR ruim). Se, mesmo com as páginas extras, ele ficar abaixo de 100, comparamos esse período com ressalva, dizendo que tem menos anúncios.
-- **Se a separação das 49 páginas der muito ruído** (como nas páginas de letra grande dos anos 1860), ela entra na lista de correções antes do `hdb corpus`.
-- **Um CAPTCHA parado trava a captura por 10 minutos.** Quem captura deve ficar com o terminal à vista.
-
----
-
-## Quem faz o quê
-
-Cada pessoa fica com um ou dois **períodos legais**. Ela coleta os anúncios do seu período, estuda as leis dele e apresenta os resultados dele. A Pessoa 1 cuida também da ferramenta.
-
-| Pessoa | Período | Acervo | Leis para contextualizar | Páginas a capturar | CAPTCHAs (aprox.) |
-|---|---|---|---|---:|---:|
-| **Pessoa 1** (sugestão: quem cuida da ferramenta) | 1871–1888 | JC 1870s (`364568_06`) | Ventre Livre (1871), Sexagenários (1885), Áurea (1888) | 18 | 5 |
-| **Pessoa 2** | antes de 1831 e 1831–1850 | JC 1827–29 (`364568_01`) e JC 1830s (`364568_02`) | Lei Feijó (1831) | 33 | 10 |
-| **Pessoa 3** | 1850–1871 | JC 1860s (`364568_05`) | Lei Eusébio de Queirós (1850) | 18 | 5 |
-
-A Pessoa 2 tem mais páginas, mas dois acervos pequenos e, na Fase 3, uma tarefa curta.
-
-### Os dados de cada pessoa
-
-O número depois do termo é quantas páginas capturar.
-
-| Tipo | Pessoa 2: antes de 1831 (JC 1827–29) | Pessoa 2: 1831–1850 (JC 1830s) | Pessoa 3: 1850–1871 (JC 1860s) | Pessoa 1: 1871–1888 (JC 1870s) |
-|---|---|---|---|---|
-| Fuga | `"escravos fugidos"` · 4 | `"escravos fugidos"` · 4 | `"fugio o escravo"` · 4 | `"fugio o escravo"` · 4 |
-| Venda | `"vende-se uma preta"` · 4 | `"vende-se uma preta"` · 4 | `"vende-se uma preta"` · 4 | `"vende-se uma preta"` · 4 |
-| Aluguel | `"aluga-se uma preta"` · 3 | `"aluga-se uma preta"` · 4 | `"aluga-se uma escrava"` · 4 | `"aluga-se uma escrava"` · 4 |
-| Ama de leite | `"preta com leite"` · 3 | `"preta com leite"` · 4 | `"preta com leite"` · 4 | `"preta com leite"` · 4 |
-| Compra | `"compra-se escravos"` · 1 | `"compra-se um moleque"` · 2 | `"compra-se escravos"` · 2 | `"compra-se escravos"` · 2 |
-
-As **39 páginas já capturadas** (Diário do RJ de 1821, Diário Fluminense de 1825–1831 e Jornal do Commercio dos anos 1840, 1850, 1860 e 1880) entram no corpus de todos.
-
----
-
-## Antes de começar (cada pessoa, uma vez)
-
-1. Preparar o computador conforme o [guia](guia_ferramenta.md), seção "O que precisa estar pronto": Python, `requirements.txt`, Chromium do Playwright e Tesseract em português.
-2. Receber o arquivo `.env` da Pessoa 1, **por um canal privado** (nunca em grupo ou mensagem pública).
-3. Conferir que tudo funciona: `PYTHONPATH=src .venv/bin/python scripts/amostra.py situacao --pessoa N` mostra a sua tabela.
-
----
-
-## Fase 1: Pegar os dados
-
-As três pessoas trabalham ao mesmo tempo, cada uma nas suas células. O banco nunca entrega a mesma página a duas pessoas.
-
-| Pessoa | Faz | Comando | Tempo | Pronto quando |
-|---|---|---|---|---|
-| **1** | Lista e captura 1871–1888 | `scripts/amostra.py listar --pessoa 1`, depois `capturar --pessoa 1 --quem Nome` | listar ~20 min (sozinho); capturar ~1 h, digitando ~5 CAPTCHAs | `situacao --pessoa 1` mostra 18 de 18 |
-| **2** | Lista e captura antes de 1831 e 1831–1850 | `scripts/amostra.py listar --pessoa 2`, depois `capturar --pessoa 2 --quem Nome` | listar ~45 min (sozinho); capturar ~1,5 h, digitando ~10 CAPTCHAs | `situacao --pessoa 2` mostra 33 de 33 |
-| **3** | Lista e captura 1850–1871 | `scripts/amostra.py listar --pessoa 3`, depois `capturar --pessoa 3 --quem Nome` | listar ~35 min (sozinho); capturar ~1 h, digitando ~5 CAPTCHAs | `situacao --pessoa 3` mostra 18 de 18 |
-
-Os comandos começam com `PYTHONPATH=src .venv/bin/python`. Se algo parar, rode o mesmo comando de novo: ele continua de onde estava, sem repetir páginas.
-
-**Fase 1 pronta quando:** `scripts/amostra.py situacao` (sem `--pessoa`) mostra **69 de 69**.
-
----
-
-## Fase 2: Agrupar (páginas → anúncios → corpus)
-
-| Pessoa | Faz | Comando ou atividade | Pronto quando |
-|---|---|---|---|
-| **1, 2 e 3** | Separa os anúncios das **próprias** páginas. As imagens ficam no computador de quem capturou. | `hdb anuncios` | o comando termina sem erro |
-| **1** | Extrai os campos de todos os anúncios (tipo, sexo, idade, nação, nome) | `hdb campos` | o resumo mostra os 5 tipos em todos os períodos |
-| **1, 2 e 3** | Olha **10 anúncios** do próprio período, uns 15 minutos, e anota os erros grosseiros (tipo errado, dois anúncios grudados). Não é rotular: é ver se dá para confiar. | consulta "Conferir uma amostra" no [guia](guia_ferramenta.md), passo 10, com `limit 10` e o filtro do próprio período | anotações enviadas à Pessoa 1 |
-| **1** | Prepara o corpus padronizado (grafia, palavras vazias, corte de qualidade) | `hdb corpus` (construído na Fase 3) | o corpus está no banco, com anúncios nos 4 períodos |
-| **1** | Roda o LDA e grava os tópicos | `hdb topicos` (construído na Fase 3) | cada tópico tem palavras e anúncios-exemplo no banco |
-
-**Fase 2 pronta quando:** os tópicos estão no banco e cada pessoa consegue ver os do seu período.
-
----
-
-## Fase 3: Criar o que falta na ferramenta
-
-A Fase 3 corre **junto com a Fase 1**, enquanto as capturas rodam.
-
-| Pessoa | Faz | Por quê | Pronto quando |
-|---|---|---|---|
-| **1** | **Separação v3:** usar o travessão ("— DESEJA-SE…") como divisor de anúncios | hoje dois ou três anúncios vizinhos às vezes saem grudados | os anúncios grudados do exemplo 5941 saem separados |
-| **1** | **`hdb corpus`:** filtra os anúncios relevantes, aplica o corte de qualidade e grava o texto padronizado | entrada do LDA | o comando roda nos anúncios atuais |
-| **1** | **`hdb topicos`:** roda o LDA (`scikit-learn`) e grava os tópicos e a mistura de cada anúncio | é o resultado do projeto | o comando roda e o resultado se repete ao rodar de novo |
-| **2** | **Lista de grafias da época** para a padronização. Exemplos: `hum`→`um`, `huma`→`uma`, `annos`→`anos`, `fugio`→`fugiu`, `ph`→`f`. Tirar dos anúncios do próprio período, que são os de grafia mais antiga. | sem isso, a mesma palavra se espalha em várias grafias | lista com umas 50 trocas, entregue à Pessoa 1 |
-| **3** | **Lista de palavras vazias**, que aparecem em todo anúncio e não dizem nada: `rua`, `casa`, `trata`, `n`, `largo`… | sem isso, os tópicos saem cheios de endereço | lista com umas 50 palavras, entregue à Pessoa 1 |
-| **3** | **Testar o guia:** seguir os comandos da Fase 1 como usuário novo e apontar o que não ficou claro | o guia precisa funcionar para quem não programou a ferramenta | correções anotadas e repassadas |
-
-**Fase 3 pronta quando:** `hdb corpus` e `hdb topicos` funcionam com as listas das Pessoas 2 e 3.
-
----
-
-## Fase final: Análise e apresentação
-
-| Pessoa | Faz | Entrega |
-|---|---|---|
-| **1, 2 e 3** | Lê os tópicos e uns 5 anúncios de cada um, dá nome aos tópicos e compara o próprio período com os outros | nomes dos tópicos e o que muda no período |
-| **1, 2 e 3** | Contextualização histórica das leis do próprio período, com apoio da dissertação indicada pela Fernanda | resumo de 1 página |
-| **1, 2 e 3** | De 2 a 3 slides do próprio período: tópicos, exemplos de anúncios, contexto | slides |
-| **1** | Gera o relatório metodológico (`hdb relatorio`) e junta os slides | relatório e apresentação final |
-
----
-
-## Ordem e dependências
+### Ordem
 
 ```
-Antes de começar (todos)
-      │
-      ├── Fase 1: listar e capturar (1, 2 e 3 em paralelo)
-      │
-      └── Fase 3: v3, corpus e tópicos (Pessoa 1) · grafias (Pessoa 2) · palavras vazias e teste do guia (Pessoa 3)
-      │
-      ▼
-Fase 2: anuncios (todos) → campos, corpus, topicos (Pessoa 1) → olhar 10 anúncios (todos)
-      │
-      ▼
-Fase final: nomear tópicos, contextualizar, slides (todos)
+A1 (outra máquina) ──► C1 (Claude) ──► C2 nomear ──► C4 slides ──► C5 apresentação
+A2 (1886–1888) ─────────► C1 (nova rodada)           ▲
+B1 (conferir 10) ──► B2 (decidir aluguel)           │
+C3 (contexto histórico) ─────────────────────────────┘
 ```
+
+A1 e B1 podem começar hoje, em paralelo. A2 é o que mais fortalece a conclusão.
 
 ---
 
-## O que já está pronto
+## Parte 3: Melhorias possíveis
 
-- **Busca na HDB:** termos contados, frases escolhidas e panorama do RJ 1850–1859 feito (o Jornal do Commercio é o jornal certo).
-- **Captura com CAPTCHA por pessoa:** OCR local e banco compartilhado sem retrabalho. **88 páginas** no banco (49 da amostra, capturadas por uma pessoa do grupo desde 20/11, e 39 anteriores).
-- **Separação dos anúncios:** 3.796 anúncios em 39 páginas, 347 deles de pessoas escravizadas. **Faltam as 49 páginas novas** (ver "Situação em 23/11").
-- **Extração de campos:** tipo, sexo, idade, nação, nome, recompensa e período legal.
-- **Relatório metodológico, notebook didático, script da amostra (com `--pessoa`) e repositório no GitHub.**
-- **286 testes automáticos.**
+Em ordem de retorno para o projeto. Nenhuma é obrigatória.
+
+### Para a conclusão ficar mais forte
+
+| # | Melhoria | Por quê | Esforço |
+|---|---|---|---|
+| M1 | **Checagem de cobertura:** capturar ~10 páginas por período **sem termo de busca** e contar quantos anúncios de escravizados as frases perderam | é a melhor defesa contra a crítica "a amostra foi escolhida pelas frases"; exige um ajuste na captura | médio |
+| M2 | **Buscar vendas e compras de homens depois de 1850** com palavras soltas na mesma página (`vende escravo`), porque a frase "vende-se um preto" some | a amostra de venda hoje tem viés para mulheres | médio |
+| M3 | **Segundo jornal** (Correio Mercantil, Diário do RJ 1860–78) | mostra se o padrão é do jornal ou da época; a HDB tem falhado para esses acervos | depende do site |
+| M4 | **Mais anúncios por período**, sorteando por ano em vez de seguir a ordem da lista | a cobertura de anos fica uniforme | baixo |
+
+### Para os tópicos ficarem mais limpos
+
+| # | Melhoria | Por quê | Esforço |
+|---|---|---|---|
+| M5 | **Um modelo por tipo** (só fuga, só aluguel…) além do geral | os tópicos hoje seguem em grande parte o tipo; dentro de cada tipo os temas mostram mudança real | baixo |
+| M6 | **Expressões de duas palavras** ("ama de leite", "de nação", "bom cozinheiro") como uma unidade | o LDA separa palavras que só fazem sentido juntas | baixo |
+| M7 | **Métrica de coerência** (c_v, com `gensim`) além da estabilidade | escolher o número de tópicos por mais de um critério | baixo |
+| M8 | **Lista de grafias e de palavras vazias revisada pelo grupo** (Pessoas 2 e 3 do plano anterior). A primeira versão foi gerada pela ferramenta a partir das palavras mais frequentes | quem conhece o período acha o que a ferramenta não vê | baixo |
+| M9 | **BERTopic** (modelo de linguagem) para comparar com o LDA | só se sobrar tempo; baixa um modelo grande | alto |
+
+### Para a ferramenta
+
+| # | Melhoria | Por quê | Esforço |
+|---|---|---|---|
+| M10 | **Guardar as palavras do OCR no banco** (atividade 3.1) | ninguém depende de imagens de outra máquina; permite melhorar a separação depois | médio |
+| M11 | **Melhorar o OCR do JC 1860–1880** (pré-processamento da imagem; confiança média hoje em 63–67) | os anos 1870 têm "LUGA-SE", "cosinta", "engomms" | médio |
+| M12 | **Extrair idade e valor em mais anúncios** (hoje só 13% têm idade; 3 fugas têm valor de recompensa) | os recortes por idade têm n de 9 a 58 | médio |
+| M13 | **Regra de venda e compra com marca de escravizado**, como no aluguel (`c5`) | "VENDE-SE uma criada" ainda passa | baixo |
+| M14 | **Tela para o grupo consultar tópicos e anúncios** (página simples lendo o banco) | quem não programa lê e confere sem SQL | médio |
+
+---
+
+## Os limites que precisam aparecer na apresentação
+
+1. A amostra vem de **frases de busca**, não do jornal inteiro. As proporções (tipo, sexo) não representam o jornal.
+2. **Antes de 1831** a amostra é quase toda do Diário do RJ; os outros períodos, do Jornal do Commercio.
+3. O JC dos anos 1880 cobre 1880, 1881 e 1885, **e nada de 1886 a 1888**, que é o fim do período mais interessante.
+4. Só 13% dos anúncios têm idade, e o sexo, dentro do mesmo tipo, quase não separa os tópicos.
+5. O OCR dos anos 1860–1880 é pior; sobram palavras quebradas e anúncios colados.
+6. **Os tópicos são padrões de palavras, não fatos.** Os nomes são hipóteses do grupo.
+7. A queda da fuga e a subida do aluguel entre os períodos são em parte efeito da composição da amostra (ver M1, M2 e M4).
+
+---
 
 ## Riscos
 
 | Risco | O que fazer |
 |---|---|
-| O site muda ou o CAPTCHA aparece a cada página | capturar menos páginas por célula (de 2 a 3) e avisar a Pessoa 1 |
-| Uma célula tem poucas páginas boas | aceitar menos; o corpus de todas as células junto ainda compara os períodos |
-| Tópicos confusos por ruído do OCR | reforçar as listas de grafias e de palavras vazias e rodar de novo com outro número de tópicos |
-| O plano gratuito do Supabase enche | improvável com cerca de 110 páginas; a Pessoa 1 acompanha |
+| As imagens das 49 páginas não existem mais | plano B (A4): guardar as palavras no banco e recapturar |
+| O site da HDB bloqueia ou muda | amostra pequena, pausas fixas, nada repetido; avisar o Diego |
+| Os acervos do Diário do RJ e do Correio Mercantil continuam a falhar | seguir só com o Jornal do Commercio |
+| Poucos anúncios por período dão tópicos instáveis | rodar a estabilidade a cada mudança de corpus e usar k=6 |
+| Os tópicos refletem o que as frases acharam, não o jornal | escrever isso nos slides; fazer a checagem de cobertura (M1) se der |
+| O plano gratuito do Supabase enche | improvável; a Pessoa 1 acompanha |
+
+---
+
+## Quem faz o quê
+
+| Pessoa | Período | Leis para contextualizar |
+|---|---|---|
+| **Pessoa 1** (ferramenta) | 1871–1888 | Ventre Livre (1871), Sexagenários (1885), Áurea (1888) |
+| **Pessoa 2** | antes de 1831 e 1831–1850 | Lei Feijó (1831) |
+| **Pessoa 3** | 1850–1871 | Lei Eusébio de Queirós (1850) |
+
+Cada pessoa confere, nomeia os tópicos e apresenta o **próprio período**. A captura segue o [tutorial rápido](tutorial_captura.md). Regras fixas: o `.env` nunca é compartilhado em grupo; o CAPTCHA é sempre digitado por uma pessoa; nada de `data/` e `.env` vai para o git.
