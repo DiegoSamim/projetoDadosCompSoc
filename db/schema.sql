@@ -442,7 +442,7 @@ grant select on table public.panorama to service_role;
 create table if not exists public.anuncio_campos (
     anuncio_id bigint not null references public.anuncios (id) on delete cascade,
     versao     text   not null,
-    tipo       text,  -- fuga, venda, compra, aluguel, ama_de_leite, outro
+    tipo       text,  -- fuga, venda, compra, aluguel, aluguel_incerto (aluguel sem marca de escravizado), ama_de_leite, outro
     procura    boolean,  -- quem anuncia quer obter alguém (COMPRA-SE, PRECISA-SE)
     sexo       text,  -- m, f, ambos
     idade_min  smallint,

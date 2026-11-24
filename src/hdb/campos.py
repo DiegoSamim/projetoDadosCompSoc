@@ -10,8 +10,8 @@ from collections import Counter
 from hdb.config import LOTE_CAMPOS, VERSAO_CAMPOS
 from hdb.anuncios import achar_abertura, achar_numeracao, distancia, e_secao
 
-TIPOS = ("fuga", "venda", "compra", "aluguel", "ama_de_leite", "outro")
-TIPOS_DE_PESSOA = ("venda", "compra", "aluguel", "ama_de_leite")  # tipos em que a condição pode ser "desconhecida"
+TIPOS = ("fuga", "venda", "compra", "aluguel", "aluguel_incerto", "ama_de_leite", "outro")
+TIPOS_DE_PESSOA = ("venda", "compra", "aluguel", "aluguel_incerto", "ama_de_leite")  # tipos em que a condição pode ser "desconhecida"
 
 IDADE_MAXIMA = 90
 NACAO_ERROS = 1  # erros de OCR tolerados no nome de uma nação
@@ -67,6 +67,10 @@ JANELA_PESSOA = 200  # caracteres iniciais onde a pessoa anunciada tem de aparec
 NACIONALIDADE_LIVRE = re.compile(  # quem é "portuguez", "ingleza"... num anúncio de negócio é gente livre, não escravizada
     r"\b(?:portugue[sz]a?s?|ingle[sz]a?s?|franc[ae][sz]a?s?|alle?m[aã]o?e?s?|italian[oa]s?|"
     r"hespanh[oa]l[a]?s?|pessoa\s+livre)\b")
+NEGOCIO = re.compile(  # verbo de negócio que abre um anúncio ("Comprão-se" vira "comprao-se" sem acento)
+    r"\b(?:vend(?:e|em)|compr(?:a|am|ao)|alug(?:a|am)|precis(?:a|am|ao))\s*-?\s*se\b")
+ENTRE_VERBOS = 15  # caracteres mínimos entre dois verbos de negócio para o 2º abrir outro anúncio ("vende-se ou aluga-se" não)
+LIVRE_OU_ESCRAVO = re.compile(r"\blivres?\s+ou\s+escrav[oa]s?\b|\bescrav[oa]s?\s+ou\s+livres?\b")  # não marca ninguém
 MARCA_ESCRAVIZADO = re.compile(r"\b(?:moleque|molecote|moleca|molecota)s?\b")  # além de cores, escravo, forro
 NAVIO = re.compile(r"\bequip\w*\.?\s*\d|\bpassag\w*\.?\s*\d|\bcarga\b")  # movimento de porto, "1 escravo" passageiro
 ACHAR = re.compile(r"\bquem\s*[oa]?\s*(?:o\s+|a\s+)?(?:achar|apprehender|pegar|prender|capturar|trouxer)")
@@ -223,16 +227,36 @@ def _marca_de_escravizado(norm):
                 or any(p in CORES for p, _, _ in _palavras(norm)))
 
 
+def _janela(norm):
+    """Os primeiros JANELA_PESSOA caracteres, cortados no início de um 2º anúncio colado (2º verbo de negócio)."""
+    inicio = norm[:JANELA_PESSOA]
+    verbos = list(NEGOCIO.finditer(inicio))
+    for primeiro, segundo in zip(verbos, verbos[1:]):
+        if segundo.start() - primeiro.end() >= ENTRE_VERBOS:
+            return inicio[:segundo.start()]
+    return inicio
+
+
+def _motivo_de_incerto(norm):
+    """Por que um aluguel não tem marca explícita de escravizado (vira "aluguel_incerto"), ou None se tem."""
+    inicio = LIVRE_OU_ESCRAVO.sub(" ", _janela(norm))
+    if _marca_de_escravizado(inicio):
+        return None
+    pessoa = next((p for p, _, _ in _pessoas(inicio)), None)
+    livre = LIVRE_OU_ESCRAVO.search(_janela(norm))
+    return f"pessoa sem marca de escravizado: {pessoa or (livre.group() if livre else 'pessoa')}"
+
+
 def _motivo_de_outro(norm):
     """Por que um venda/compra/aluguel não é de pessoa escravizada (vira "outro"), ou None se segue valendo.
 
-    1. Sem palavra de pessoa nos primeiros JANELA_PESSOA caracteres ("ALUGA-SE uma sala para escriptorio"). Só o
+    1. Sem palavra de pessoa nos primeiros JANELA_PESSOA caracteres (cortados no 2º anúncio colado, ver `_janela`) ("ALUGA-SE uma sala para escriptorio"). Só o
        começo: o OCR cola anúncios vizinhos, e uma pessoa que só aparece depois é do anúncio seguinte, não deste
        ("VENDE-SE a casa terrea... " + "huma preta de 20 annos"); 200 caracteres cobrem um anúncio curto inteiro.
     2. Marcador de pessoa livre (nacionalidade, "pessoa livre", "senhora", "moça livre") sem nenhuma marca de
        escravizado ou cor ("aluga-se uma senhora portugueza").
     """
-    inicio = norm[:JANELA_PESSOA]
+    inicio = _janela(norm)
     if not _pessoas(inicio):
         return "sem palavra de pessoa nos primeiros 200 caracteres"
     livre = NACIONALIDADE_LIVRE.search(inicio) or SRA.search(inicio) or LIVRE.search(inicio)
@@ -258,7 +282,8 @@ def classificar(anuncio):
     com gente (para "VENDE-SE ... não fugio" não virar fuga; aviso numerado "N." precisa delas); 5. fala de pessoa
     (palavra de pessoa com contexto de pessoa; "seda preta" não vale); 6. ama de leite (vale mesmo com
     ALUGA-SE/VENDE-SE); 7. venda/compra/aluguel, só com pessoa escravizável no começo do anúncio (c3; ver
-    `_motivo_de_outro`); 8. outro. `procura` é o lado da demanda (quem anuncia quer obter alguém): True para COMPRA-SE e PRECISA-SE
+    `_motivo_de_outro`); aluguel (inclusive PRECISA-SE) sem marca explícita de escravizado na janela é
+    "aluguel_incerto" (c4; ver `_motivo_de_incerto`); 8. outro. `procura` é o lado da demanda (quem anuncia quer obter alguém): True para COMPRA-SE e PRECISA-SE
     (alugar, comprar ou só pessoa); False para VENDE-SE, ALUGA-SE e OFFERECE-SE.
     """
     tipo, procura, _ = _classificar(anuncio)
@@ -266,7 +291,7 @@ def classificar(anuncio):
 
 
 def _classificar(anuncio):
-    """(tipo, procura, motivo): motivo só quando venda/compra/aluguel virou "outro"."""
+    """(tipo, procura, motivo): motivo só quando venda/compra/aluguel virou "outro" ou aluguel virou "aluguel_incerto"."""
     texto = anuncio.get("texto") or ""
     norm = _simples(texto)
     abertura = anuncio.get("abertura") or achar_abertura(texto) or achar_numeracao(texto)
@@ -289,7 +314,13 @@ def _classificar(anuncio):
         return "outro", False, None
     tipo, procura = _tipo_do_negocio(verbo, norm)
     motivo = _motivo_de_outro(norm)
-    return ("outro", False, motivo) if motivo else (tipo, procura, None)
+    if motivo:
+        return "outro", False, motivo
+    if tipo == "aluguel":  # c4: só com marca explícita de escravizado na janela; senão não dá para dizer
+        incerto = _motivo_de_incerto(norm)
+        if incerto:
+            return "aluguel_incerto", procura, incerto
+    return tipo, procura, None
 
 
 # --- extração ---

@@ -1,6 +1,6 @@
 from hdb import config
 from hdb.banco import BancoMemoria
-from hdb.corpus import formatar_resumo, padronizar, processar, selecionar
+from hdb.corpus import MOTIVOS, formatar_resumo, motivo_descarte, padronizar, processar, selecionar
 
 JC_1840 = ("FUGIO hum molecote de 14 a 16 annos de idade, de nação Benguella, de nome Joaquim, levando vestido "
            "camiza de baeta amarela e calças de lila preta, bastante relinto; adverte-se que fugio na sabbado 4 do "
@@ -13,10 +13,10 @@ def anuncio(**kw):
 
 def test_padronizar_anuncio_real_de_1840():
     palavras = padronizar(JC_1840).split()
-    for esperada in ("fugiu", "molecote", "anos", "benguela", "joaquim", "camisa", "baeta", "calcas", "nacao"):
+    for esperada in ("fugiu", "molecote", "anos", "benguela", "camisa", "baeta", "calcas", "nacao"):
         assert esperada in palavras
     assert palavras.count("fugiu") == 2 and "sabado" in palavras
-    for ausente in ("hum", "um", "de", "fugio", "annos", "camiza", "benguella", "largo", "paco", "14", "16", "4", "5", "n"):
+    for ausente in ("hum", "um", "de", "joaquim", "fugio", "annos", "camiza", "benguella", "largo", "paco", "14", "16", "4", "5", "n"):
         assert ausente not in palavras
     assert not any(c.isdigit() or c in ",;.-" for c in padronizar(JC_1840))
 
@@ -25,6 +25,17 @@ def test_padronizar_grafia_enderecos_e_tokens_curtos():
     assert padronizar("Huma preta, pharmacia; Rua do Rozario n. 107, tratase") == "preta farmacia tratase"
     assert padronizar("Vende-se o escravo de 20 annos na rua Direita n.º 5, com 2 filhos") == "vende escravo anos filhos"
     assert padronizar(None) == "" and padronizar("a o de 12") == ""
+
+
+def test_ocr_unifica_aluga_precisa_e_quiser():
+    assert padronizar("Luga-se uma preta. Aluga-se outra; recisa-se de ama; ecisa cozinheiro; quizer ende") == \
+        "aluga preta aluga outra precisa ama precisa cozinheiro quiser vende"
+    assert padronizar("ras rus ros nde bum huma") == ""
+
+
+def test_nomes_e_loteria_saem():
+    texto = "Vende-se preto Jose Antonio Pedro, comprou por conta; bilhete e bilhetes da loteria, Joaquim Maria"
+    assert padronizar(texto) == "vende preto"
 
 
 def test_padronizar_nao_altera_o_original():
@@ -39,6 +50,9 @@ def test_selecionar():
     assert selecionar(anuncio())
     assert selecionar(anuncio(confianca=50, texto="um dois tres quatro cinco seis sete oito"))
     assert not selecionar(anuncio(c_tipo="outro")) and not selecionar(anuncio(c_tipo=None))
+    assert not selecionar(anuncio(c_tipo="aluguel_incerto"))
+    assert motivo_descarte(anuncio(c_tipo="aluguel_incerto")) == "incerto" and "incerto" in MOTIVOS
+    assert selecionar(anuncio(c_tipo="aluguel"))
     assert not selecionar(anuncio(confianca=49.9)) and not selecionar(anuncio(confianca=None))
     assert not selecionar(anuncio(texto="um dois tres quatro cinco seis sete"))
     assert not selecionar(anuncio(texto=None))

@@ -313,8 +313,12 @@ def c3(texto, abertura):
     return extrair_anuncio({"texto": texto, "abertura": abertura})
 
 
-def test_versao_c3():
-    assert VERSAO_CAMPOS == "c3"
+def c4(texto, abertura):
+    return extrair_anuncio({"texto": texto, "abertura": abertura})
+
+
+def test_versao_c4():
+    assert VERSAO_CAMPOS == "c4"
 
 
 @pytest.mark.parametrize("texto,abertura", [
@@ -357,7 +361,8 @@ def test_c3_aluga_preta_e_aluguel_de_mulher_com_condicao_desconhecida():
 
 def test_c3_rapariga_e_ama_nao_dizem_a_condicao():
     r = c3("ALUGA-SE huma rapariga para casa de pouca familia; na rua do Lavradio n. 7.", "ALUGA-SE")
-    assert (r["tipo"], r["sexo"], r["condicao"]) == ("aluguel", "f", "desconhecida")
+    assert (r["tipo"], r["sexo"], r["condicao"]) == ("aluguel_incerto", "f", "desconhecida")
+    assert "sem marca de escravizado: rapariga" in r["evidencias"]["tipo"]
     r = c3("ALUGA-SE huma ama de leite do primeiro parto", "ALUGA-SE")
     assert (r["tipo"], r["condicao"]) == ("ama_de_leite", "desconhecida")
 
@@ -371,3 +376,37 @@ def test_c3_venda_de_negrinha_e_condicao_explicita_continua():
 def test_c3_fuga_e_outro_nao_ganham_desconhecida():
     assert c3(T9, "N.")["condicao"] is None
     assert c3("ALUGA-SE huma sala", "ALUGA-SE")["condicao"] is None
+
+
+# --- c4: aluguel só com marca explícita de escravizado na janela; senão aluguel_incerto ---
+
+def test_c4_aluguel_sem_marca_e_incerto():
+    r = c4("ALUGA-SE huma criada branca para casa de pouca familia", "ALUGA-SE")
+    assert (r["tipo"], r["procura"], r["condicao"]) == ("aluguel_incerto", False, "desconhecida")
+    assert "sem marca de escravizado: criada" in r["evidencias"]["tipo"]
+    r = c4("PRECISA-SE de huma criada, livre ou escravo, que saiba cozinhar", "PRECISA-SE")
+    assert (r["tipo"], r["procura"]) == ("aluguel_incerto", True)  # "livre ou escravo" não é marca
+
+
+def test_c4_aluguel_com_marca_continua_aluguel():
+    assert c4("ALUGA-SE um bom preto para todo o serviço; na rua da Guarda-Velha n. 35", "ALUGA-SE")["tipo"] == "aluguel"
+    assert c4("ALUGA-SE huma preta que cozinha e lava", "ALUGA-SE")["tipo"] == "aluguel"
+    assert c4("PRECISA-SE de huma criada preta, livre ou escravo", "PRECISA-SE")["tipo"] == "aluguel"  # marca fora da frase
+
+
+def test_c4_anuncio_colado_nao_empresta_a_marca():
+    colado = "ALUGA-SE huma sala para escriptorio na rua X. ESCRAVOS — Comprão-se escravos de ambos os sexos"
+    assert c4(colado, "ALUGA-SE")["tipo"] in ("outro", "aluguel_incerto")
+    assert c4(colado, "ALUGA-SE")["tipo"] != "aluguel"
+    # pessoa sem marca no 1º anúncio, marca só no 2º colado: não é aluguel
+    r = c4("ALUGA-SE huma criada para casa de familia; na rua X n. 3. VENDE-SE huma preta de 20 annos", "ALUGA-SE")
+    assert r["tipo"] == "aluguel_incerto"
+    # venda: o corte vale para a regra de pessoa do c3
+    assert c4("VENDE-SE huma casa na rua Larga n. 3, com sala. COMPRA-SE huma preta de 20 annos", "VENDE-SE")["tipo"] == "outro"
+    # "vende-se ou aluga-se": o 2º verbo é do mesmo anúncio
+    assert c4("VENDE-SE ou ALUGA-SE huma preta de 20 annos", "VENDE-SE")["tipo"] == "venda"
+
+
+def test_c4_resumo_conta_aluguel_incerto():
+    r = resumir([{"tipo": "aluguel_incerto", "sexo": None, "idade_min": None, "nacoes": [], "nomes": [], "recompensa": False}])
+    assert r["por_tipo"] == {"aluguel_incerto": 1} and "aluguel_incerto: 1" in formatar_resumo(r)
