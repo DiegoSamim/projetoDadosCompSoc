@@ -33,31 +33,30 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 
 ## Situação em 23/11 e plano para terminar hoje
 
-### O que os dados mostram
+### O que os dados mostram (atualizado em 23/11, à noite)
 
 | | Hoje | Meta |
 |---|---|---|
-| Páginas capturadas da amostra | **49 de 69** (todas por uma pessoa do grupo, desde 20/11) | 69 |
-| Páginas com anúncios separados | **39 de 88** capturadas | todas |
-| Anúncios de pessoas escravizadas (tipo ≠ outro) | **347** | pelo menos 100 por período legal |
+| Páginas capturadas (amostra completa: **69 de 69**) | **108** | amostra + extras + complemento |
+| Páginas com anúncios separados | **59 de 108** | todas |
+| Anúncios de pessoas escravizadas (tipo ≠ outro) | **676** | pelo menos 100 por período legal |
 
-**Anúncios relevantes por período (só as 39 páginas separadas):**
+**Anúncios relevantes por período (das 59 páginas já separadas):**
 
-| Período | Páginas | Relevantes | Fuga | Venda | Aluguel | Ama de leite | Compra |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| antes de 1831 | 10 | **28** | 28 | 0 | 0 | 0 | 0 |
-| 1831–1850 | 10 | 136 | 26 | 54 | 35 | 18 | 3 |
-| 1850–1871 | 13 | 158 | 32 | 38 | 68 | 18 | 2 |
-| 1871–1888 | 6 | **25** | 18 | 4 | 3 | 0 | 0 |
+| Período | Relevantes | Fuga | Venda | Aluguel | Ama de leite | Compra | Situação |
+|---|---:|---:|---:|---:|---:|---:|---|
+| antes de 1831 | **28** | 28 | 0 | 0 | 0 | 0 | **fraco** (só fuga; 15 páginas do JC 1827–29 ainda sem separar) |
+| 1831–1850 | 136 | 26 | 54 | 35 | 18 | 3 | ok (18 páginas do JC 1830s ainda sem separar) |
+| 1850–1871 | 203 | 34 | 51 | 93 | 22 | 3 | ok (16 páginas do JC 1860s ainda sem separar) |
+| 1871–1888 | 309 | 33 | 58 | **201** | 13 | 4 | ok em volume; **fuga fraca e aluguel a conferir** |
 
 **O que isso quer dizer:**
 
-1. **Falta separar os anúncios de 49 páginas.** São exatamente as páginas novas (JC 1827–29, JC 1830s e 16 do JC 1860s). A separação precisa da **imagem**, e as imagens estão no computador de quem capturou. Hoje só o texto foi para o banco, e o texto sozinho não dá as posições das palavras. **É o maior gargalo e destrava quase tudo.** Por isso a atividade 3.1 ("anúncios dentro da captura") passa a ser a primeira.
-2. **Os extremos estão fracos.** "Antes de 1831" só tem fuga (e do Diário do RJ e do Diário Fluminense, não do Jornal do Commercio); "1871–1888" tem só 25 anúncios.
-3. **A densidade cai nas décadas tardias.** Nos anos 1840 e 1850 saem de 15 a 19 anúncios relevantes por página. Nos anos 1860 e 1880, cerca de 4 por página, porque a letra é miúda, o OCR é pior (confiança de 56 a 66, contra 75 a 84 nos anos 1830) e há muito aviso não relacionado. Para chegar a 100 anúncios nesses períodos, são necessárias umas 25 páginas, e não 18.
-4. **O mesmo anúncio se repete.** O jornal publicava o anúncio de fuga do "preto Thomé" em várias edições, e ele entrou duas vezes na tabela. Sem tratar isso, a modelagem de tópicos vai achar "um tópico" que é só um anúncio repetido.
-5. **Em páginas de letra grande, o título se separa do corpo** ("ESCRAVO FUGIDO," virou um anúncio sozinho) e o texto continua na coluna seguinte. Isso gera fragmentos curtos.
-6. **A captura em si vai bem:** 49 páginas em cerca de 63 s cada, 9 CAPTCHAs (uma página de cada 5). Houve 2 falhas por esperar o CAPTCHA por 10 minutos sem ninguém digitar.
+1. **A separação das 49 páginas novas continua pendente** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). A separação precisa da imagem, e essas imagens estão no computador de quem capturou. É o que mais muda os números, sobretudo "antes de 1831".
+2. **Corrigi uma estimativa:** eu tinha previsto cerca de 4 anúncios por página nos anos 1870. A medida real é **18 por página** (325 anúncios em 18 páginas). Os anos 1860 e 1880 continuam baixos (cerca de 4 por página), então a baixa densidade não é regra das décadas tardias.
+3. **Anúncios repetidos são raros nesta amostra:** só cerca de 0,5% repetem o início do texto. O risco existe, mas é pequeno enquanto as páginas forem sorteadas. Tratar duplicatas deixa de ser urgente.
+4. **Pendências de qualidade:** 201 "aluguéis" em 1871–1888 é um número alto e **não foi conferido**; pode haver anúncios de aluguel de outra coisa classificados como de pessoas. Também há 56 anúncios com menos de 60 caracteres (fragmentos).
+5. **A captura vai bem:** cerca de 63 s por página, uma página de cada 5 com CAPTCHA.
 
 ### O que fazer hoje, em ordem
 
