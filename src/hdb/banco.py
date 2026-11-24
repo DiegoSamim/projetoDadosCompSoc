@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from hdb import config
+from hdb.palavras import comprimir_palavras, descomprimir_palavras
 
 
 def _int(valor):
@@ -111,16 +112,36 @@ class BancoSupabase:
              "posicao": int(linha["ocorrencia"]), "total": _int(linha.get("total_ocorrencias"))},
             on_conflict="bib,termo,posicao", ignore_duplicates=True).execute()
 
+    def paginas_por_ano(self, bib, termo):
+        """{ano: {"ok": n, "total": n}} das páginas listadas dessa busca (ano None fica de fora)."""
+        linhas = _todas(self.cliente.table("ocorrencias").select("id,pagina_id,paginas(ano,status)")
+                        .eq("bib", str(bib)).eq("termo", termo).order("id"))
+        vistas, anos = set(), {}
+        for l in linhas:
+            pg = l.get("paginas")
+            if l["pagina_id"] in vistas or not pg or pg.get("ano") is None:
+                continue
+            vistas.add(l["pagina_id"])
+            d = anos.setdefault(pg["ano"], {"ok": 0, "total": 0})
+            d["total"] += 1
+            d["ok"] += pg["status"] == "ok"
+        return anos
+
     def contar_ocorrencias(self, bib, termo):
         resposta = (self.cliente.table("ocorrencias").select("id", count="exact", head=True)
                     .eq("bib", str(bib)).eq("termo", termo).execute())
         return resposta.count
 
-    def reservar(self, quem, limite, bib=None, termo=None, aleatorio=False, excluir=()):
-        """Reserva até `limite` páginas para `quem` (sem os ids de `excluir`); devolve a lista de dicts."""
-        return self._rpc("reservar_paginas", p_quem=quem, p_limite=limite, p_bib=bib, p_termo=termo,
-                         p_aleatorio=aleatorio, p_max_tentativas=config.MAX_TENTATIVAS,
-                         p_expira_min=config.RESERVA_MINUTOS, p_excluir=list(excluir))
+    def reservar(self, quem, limite, bib=None, termo=None, aleatorio=False, excluir=(), equilibrar=False):
+        """Reserva até `limite` páginas para `quem` (sem os ids de `excluir`); devolve a lista de dicts.
+
+        Com `equilibrar`, sorteia uma página de cada ano por rodada (anos mal cobertos não ficam para trás)."""
+        params = dict(p_quem=quem, p_limite=limite, p_bib=bib, p_termo=termo,
+                      p_max_tentativas=config.MAX_TENTATIVAS, p_expira_min=config.RESERVA_MINUTOS,
+                      p_excluir=list(excluir))
+        if equilibrar:
+            return self._rpc("reservar_paginas_equilibradas", **params)
+        return self._rpc("reservar_paginas", p_aleatorio=aleatorio, **params)
 
     def registrar_sucesso(self, pagina_id, quem, largura, altura, nbytes, ocr, segundos, captchas):
         d = _dados_sucesso(ocr, segundos)
@@ -155,6 +176,24 @@ class BancoSupabase:
         """O conjunto de `pagina_id` que já têm anúncios gravados nessa versão."""
         linhas = _todas(self.cliente.table("anuncios").select("id,pagina_id").eq("versao", versao).order("id"))
         return {l["pagina_id"] for l in linhas}
+
+    def registrar_palavras(self, pagina_id, dados):
+        """Grava (ou substitui) as palavras do OCR da página; `dados` = {largura, altura, palavras}."""
+        self._rpc("registrar_palavras", p_pagina_id=pagina_id, p_largura=dados["largura"],
+                  p_altura=dados["altura"], p_palavras_gz=comprimir_palavras(dados), p_n=len(dados["palavras"]))
+
+    def palavras_da_pagina(self, pagina_id):
+        """{largura, altura, palavras} da página, ou None se não há palavras gravadas."""
+        linhas = (self.cliente.table("paginas_palavras").select("largura,altura,palavras_gz")
+                  .eq("pagina_id", pagina_id).limit(1).execute().data)
+        if not linhas:
+            return None
+        return descomprimir_palavras(linhas[0]["palavras_gz"], linhas[0]["largura"], linhas[0]["altura"])
+
+    def paginas_com_palavras(self):
+        """O conjunto de `pagina_id` que já têm palavras gravadas."""
+        return {l["pagina_id"] for l in _todas(self.cliente.table("paginas_palavras").select("pagina_id")
+                                               .order("pagina_id"))}
 
     def anuncios_para_campos(self, versao_anuncios):
         """Todos os anúncios da versão como [{id, titulo, abertura, texto}], por id."""
@@ -262,6 +301,7 @@ class BancoMemoria:
         self.leituras = {}  # (pagina_id, motor) -> dict
         self.tentativas = []
         self.lista_anuncios = {}  # (pagina_id, versao) -> lista de dicts
+        self.palavras = {}  # pagina_id -> {largura, altura, palavras_gz, n_palavras}
         self.campos = {}  # (anuncio_id, versao) -> dict
         self.corpus = {}  # (anuncio_id, versao) -> dict
         self.topico_modelos = {}  # versao -> dict
@@ -299,6 +339,18 @@ class BancoMemoria:
     def contar_ocorrencias(self, bib, termo):
         return sum(1 for b, t, _ in self.ocorrencias if b == str(bib) and t == termo)
 
+    def paginas_por_ano(self, bib, termo):
+        ids = {o["pagina_id"] for o in self.ocorrencias.values() if o["bib"] == str(bib) and o["termo"] == termo}
+        anos = {}
+        for i in ids:
+            p = self.paginas[i]
+            if p["ano"] is None:
+                continue
+            d = anos.setdefault(p["ano"], {"ok": 0, "total": 0})
+            d["total"] += 1
+            d["ok"] += p["status"] == "ok"
+        return anos
+
     def _elegivel(self, p):
         expirada = p["reservada_em"] is not None and p["reservada_em"] < (
             self.agora() - timedelta(minutes=config.RESERVA_MINUTOS))
@@ -307,13 +359,20 @@ class BancoMemoria:
                     and p["tentativas"] < config.MAX_TENTATIVAS)
                 or (p["status"] == "reservada" and expirada))
 
-    def reservar(self, quem, limite, bib=None, termo=None, aleatorio=False, excluir=()):
+    def reservar(self, quem, limite, bib=None, termo=None, aleatorio=False, excluir=(), equilibrar=False):
         com_termo = {o["pagina_id"] for o in self.ocorrencias.values() if o["termo"] == termo}
         candidatas = [p for p in self.paginas.values() if self._elegivel(p) and p["id"] not in excluir
                       and (bib is None or p["bib"] == bib) and (termo is None or p["id"] in com_termo)]
         candidatas.sort(key=lambda p: (p["bib"], p["pagina_fisica"]))
-        if aleatorio:
+        if aleatorio or equilibrar:
             random.shuffle(candidatas)
+        if equilibrar:  # rodada = posição da página entre as do seu ano, já sorteadas; sort estável mantém o sorteio
+            vistos = {}
+            rodada = {}
+            for p in candidatas:
+                vistos[p["ano"]] = vistos.get(p["ano"], 0) + 1
+                rodada[p["id"]] = vistos[p["ano"]]
+            candidatas.sort(key=lambda p: rodada[p["id"]])
         escolhidas = candidatas[:limite]
         for p in escolhidas:
             p.update(status="reservada", reservada_por=quem, reservada_em=self.agora())
@@ -367,6 +426,17 @@ class BancoMemoria:
 
     def paginas_com_anuncios(self, versao):
         return {id_ for (id_, v), lista in self.lista_anuncios.items() if v == versao and lista}
+
+    def registrar_palavras(self, pagina_id, dados):
+        self.palavras[pagina_id] = {"largura": dados["largura"], "altura": dados["altura"],
+                                    "palavras_gz": comprimir_palavras(dados), "n_palavras": len(dados["palavras"])}
+
+    def palavras_da_pagina(self, pagina_id):
+        p = self.palavras.get(pagina_id)
+        return descomprimir_palavras(p["palavras_gz"], p["largura"], p["altura"]) if p else None
+
+    def paginas_com_palavras(self):
+        return set(self.palavras)
 
     def anuncios_para_campos(self, versao_anuncios):
         achados = [a for (_, v), lista in self.lista_anuncios.items() if v == versao_anuncios for a in lista]

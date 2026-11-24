@@ -40,6 +40,8 @@ def ambiente(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "PAUSA_CAPTURA", 0)
     monkeypatch.setattr(captura, "_criar_executor", lambda workers: ThreadPoolExecutor(workers))
     monkeypatch.setattr(ocr, "extrair_texto", ocr_falso)
+    monkeypatch.setattr(config, "OCR_PALAVRAS_DIR", tmp_path / "cache")
+    monkeypatch.setattr(ocr, "ler_palavras", lambda caminho: _dados_de_palavras())
     return tmp_path
 
 
@@ -168,7 +170,7 @@ def test_respeita_max_paginas_e_nao_repete_paginas_ok(ambiente, monkeypatch):
 def test_ctrl_c_libera_as_reservas(ambiente, monkeypatch):
     contexto, _ = navegador_falso(monkeypatch, interromper_em=2)
     banco = banco_com([1, 2, 3])
-    captura.capturar(banco, "ana")
+    captura.capturar(banco, "ana", segmentar=False)  # sem o passo extra, o OCR da página 1 termina antes do Ctrl+C
     assert contexto.fechado
     assert banco.pagina("1", 1)["status"] == "ok"
     assert banco.pagina("1", 2)["status"] == "pendente" and banco.pagina("1", 3)["status"] == "pendente"
@@ -404,3 +406,83 @@ def test_anuncios_limite_conta_so_as_segmentadas(tmp_path, monkeypatch):
     banco.registrar_anuncios(p5["id"], "v1", [{"ordem": 1}])
     captura.anuncios_das_paginas(banco, [tmp_path / "imgs"], versao="v1", limite=1)
     assert len(chamadas) == 1 and banco.anuncios(p6["id"], "v1") and not banco.anuncios(p7["id"], "v1")
+
+
+# ---------- palavras no banco ----------
+
+def test_comprimir_palavras_ida_e_volta():
+    dados = _dados_de_palavras()
+    texto = captura.comprimir_palavras(dados)
+    assert isinstance(texto, str) and len(texto) < len(json.dumps(dados["palavras"]))
+    assert captura.descomprimir_palavras(texto, 1000, 1000)["palavras"] == dados["palavras"]
+
+
+def test_banco_registra_e_le_palavras():
+    banco, (p5, p6) = _banco_com_paginas([5, 6])
+    assert banco.palavras_da_pagina(p5["id"]) is None and banco.paginas_com_palavras() == set()
+    dados = {k: _dados_de_palavras()[k] for k in ("largura", "altura", "palavras")}
+    banco.registrar_palavras(p5["id"], dados)
+    assert banco.palavras_da_pagina(p5["id"]) == dados
+    assert banco.paginas_com_palavras() == {p5["id"]}
+
+
+def test_captura_segmenta_e_grava_anuncios_e_palavras(ambiente, monkeypatch):
+    monkeypatch.setattr(config, "OCR_PALAVRAS_DIR", ambiente / "cache")
+    monkeypatch.setattr(captura.ocr, "ler_palavras", lambda caminho: _dados_de_palavras())
+    navegador_falso(monkeypatch)
+    banco = banco_com([10])
+    captura.capturar(banco, "ana")
+    pid = next(iter(banco.paginas))
+    assert banco.paginas[pid]["status"] == "ok"
+    assert len(banco.anuncios(pid, config.VERSAO_ANUNCIOS)) == 1
+    assert banco.palavras_da_pagina(pid)["palavras"] == _dados_de_palavras()["palavras"]
+
+
+def test_captura_sem_segmentar_nao_grava_palavras(ambiente, monkeypatch):
+    monkeypatch.setattr(config, "OCR_PALAVRAS_DIR", ambiente / "cache")
+    monkeypatch.setattr(captura.ocr, "ler_palavras", lambda caminho: _dados_de_palavras())
+    navegador_falso(monkeypatch)
+    banco = banco_com([10])
+    captura.capturar(banco, "ana", segmentar=False)
+    assert banco.paginas_com_palavras() == set() and banco.lista_anuncios == {}
+
+
+def test_falha_na_segmentacao_nao_invalida_a_pagina(ambiente, monkeypatch, capsys):
+    monkeypatch.setattr(config, "OCR_PALAVRAS_DIR", ambiente / "cache")
+
+    def quebra(caminho):
+        raise RuntimeError("tesseract caiu")
+
+    monkeypatch.setattr(captura.ocr, "ler_palavras", quebra)
+    navegador_falso(monkeypatch)
+    banco = banco_com([10])
+    captura.capturar(banco, "ana")
+    assert [p["status"] for p in banco.paginas.values()] == ["ok"]
+    assert banco.paginas_com_palavras() == set()
+    assert "segmentação falhou (RuntimeError: tesseract caiu)" in capsys.readouterr().out
+
+
+def test_anuncios_segmenta_sem_imagem_com_palavras_do_banco(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(config, "OCR_PALAVRAS_DIR", tmp_path / "cache")
+    banco, (p5,) = _banco_com_paginas([5])
+    banco.registrar_palavras(p5["id"], _dados_de_palavras())
+    (tmp_path / "vazia").mkdir()
+    captura.anuncios_das_paginas(banco, [tmp_path / "vazia"], versao="v1")
+    assert len(banco.anuncios(p5["id"], "v1")) == 1
+    # já tem anúncios: pula; com refazer, regrava sem imagem
+    captura.anuncios_das_paginas(banco, [tmp_path / "vazia"], versao="v1")
+    assert "1 puladas" in capsys.readouterr().out
+    captura.anuncios_das_paginas(banco, [tmp_path / "vazia"], versao="v1", refazer=True)
+    assert len(banco.anuncios(p5["id"], "v1")) == 1
+
+
+def test_subir_palavras_so_sobe_o_que_falta(tmp_path, capsys):
+    banco, (p5, p6) = _banco_com_paginas([5, 6])
+    cache = tmp_path / "cache" / "b"
+    cache.mkdir(parents=True)
+    for n in (5, 6, 7):  # a 7 não existe no banco
+        (cache / f"b_{n:05d}.json").write_text(json.dumps(_dados_de_palavras()))
+    banco.registrar_palavras(p5["id"], _dados_de_palavras())
+    assert captura.subir_palavras(banco, tmp_path / "cache") == 1
+    assert banco.paginas_com_palavras() == {p5["id"], p6["id"]}
+    assert captura.subir_palavras(banco, tmp_path / "cache") == 0

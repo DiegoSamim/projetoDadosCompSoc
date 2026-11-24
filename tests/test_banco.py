@@ -291,3 +291,61 @@ def test_registrar_campos_faz_upsert_e_versoes_coexistem(banco):
     banco.registrar_campos("c2", [{"anuncio_id": 1, "tipo": "compra"}])
     assert banco.campos[(1, "c1")]["tipo"] == "outro" and banco.campos[(2, "c1")]["tipo"] == "fuga"
     assert banco.campos[(1, "c2")]["tipo"] == "compra" and len(banco.campos) == 3
+
+
+def _banco_por_ano(anos):
+    """Banco com uma página por item de `anos` (lista de anos), todas da mesma busca."""
+    b = BancoMemoria()
+    for i, ano in enumerate(anos, start=1):
+        b.registrar_ocorrencia({**linha("a", i, termo="fugido", posicao=i), "ano": str(ano)})
+    return b
+
+
+def test_equilibrar_sorteia_um_de_cada_ano_antes_de_repetir():
+    import random
+
+    for semente in range(20):
+        random.seed(semente)
+        b = _banco_por_ano([1880] * 6 + [1884] * 3 + [1886])
+        anos = [b.paginas[r["id"]]["ano"] for r in b.reservar("ana", 6, termo="fugido", equilibrar=True)]
+        assert sorted(anos[:3]) == [1880, 1884, 1886]  # a 1ª rodada tem os três anos
+        assert sorted(anos[3:5]) == [1880, 1884]       # a 2ª, os dois que ainda têm páginas
+        assert anos[5] == 1880 or anos[5] == 1884
+
+
+def test_equilibrar_so_reserva_o_que_existe():
+    b = _banco_por_ano([1880, 1880, 1881])
+    assert len(b.reservar("ana", 10, termo="fugido", equilibrar=True)) == 3
+    assert b.reservar("bia", 10, termo="fugido", equilibrar=True) == []
+
+
+def test_sem_equilibrar_a_ordem_continua_a_do_acervo():
+    b = _banco_por_ano([1880, 1880, 1881, 1881])
+    assert [r["pagina_fisica"] for r in b.reservar("ana", 4, termo="fugido")] == [1, 2, 3, 4]
+
+
+def test_paginas_por_ano_conta_ok_e_total():
+    b = _banco_por_ano([1880, 1880, 1881])
+    b.registrar_ocorrencia({**linha("a", 1, termo="fugido", posicao=9), "ano": "1880"})  # 2ª ocorrência da mesma página
+    b.registrar_ocorrencia({**linha("a", 50, termo="outro", posicao=1), "ano": "1890"})  # outra busca
+    b.paginas[1]["status"] = "ok"
+    assert b.paginas_por_ano("a", "fugido") == {1880: {"ok": 1, "total": 2}, 1881: {"ok": 0, "total": 1}}
+
+
+def test_supabase_sem_equilibrar_chama_o_rpc_antigo_com_os_mesmos_argumentos():
+    chamadas = []
+    b = object.__new__(modulo_banco.BancoSupabase)
+    b._rpc = lambda nome, **params: chamadas.append((nome, params)) or []
+    b.reservar("ana", 5, bib="a", termo="t", aleatorio=True, excluir=(7,))
+    assert chamadas == [("reservar_paginas", dict(
+        p_quem="ana", p_limite=5, p_bib="a", p_termo="t", p_aleatorio=True,
+        p_max_tentativas=config.MAX_TENTATIVAS, p_expira_min=config.RESERVA_MINUTOS, p_excluir=[7]))]
+
+
+def test_supabase_equilibrar_chama_a_funcao_nova_sem_p_aleatorio():
+    chamadas = []
+    b = object.__new__(modulo_banco.BancoSupabase)
+    b._rpc = lambda nome, **params: chamadas.append((nome, params)) or []
+    b.reservar("ana", 5, bib="a", termo="t", equilibrar=True)
+    nome, params = chamadas[0]
+    assert nome == "reservar_paginas_equilibradas" and "p_aleatorio" not in params and "p_equilibrar" not in params

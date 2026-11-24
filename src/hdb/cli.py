@@ -31,7 +31,7 @@ def cmd_capturar(args):
 
     capturar(_banco(), args.quem, bib=args.bib, termo=args.termo, max_paginas=args.max_paginas,
              aleatorio=args.aleatorio, modo=args.modo, tamanho=args.tamanho, workers=args.workers,
-             guardar=args.guardar_imagens)
+             guardar=args.guardar_imagens, segmentar=not args.sem_segmentar, equilibrar=args.equilibrar)
 
 
 def cmd_importar(args):
@@ -55,6 +55,12 @@ def cmd_anuncios(args):
     banco = None if args.sem_banco else _banco()
     anuncios_das_paginas(banco, args.pasta, versao=args.versao, limite=args.limite, depurar=args.depurar,
                          refazer=args.refazer)
+
+
+def cmd_palavras(args):
+    from hdb.captura import subir_palavras
+
+    subir_palavras(_banco(), args.pasta)
 
 
 def cmd_campos(args):
@@ -140,12 +146,16 @@ def criar_parser():
     p.add_argument("--max-paginas", type=int, default=config.MAX_PAGINAS,
                    help=f"máximo de páginas por execução (padrão: {config.MAX_PAGINAS})")
     p.add_argument("--aleatorio", action="store_true", help="sorteia as páginas em vez de seguir a ordem do acervo")
+    p.add_argument("--equilibrar", action="store_true",
+                   help="sorteia uma página de cada ano por rodada, para cobrir todos os anos da busca")
     p.add_argument("--modo", choices=("terminal", "janela"), default="terminal",
                    help="onde a pessoa resolve o CAPTCHA (padrão: terminal)")
     p.add_argument("--workers", type=int, default=config.OCR_WORKERS,
                    help=f"processos de OCR em paralelo (padrão: {config.OCR_WORKERS})")
     p.add_argument("--guardar-imagens", metavar="DIR", help="mantém uma cópia de cada imagem em DIR/<bib>/")
     p.add_argument("--tamanho", default=config.TAMANHO_HIRES, help="resolução pedida à HDB")
+    p.add_argument("--sem-segmentar", action="store_true",
+                   help="não separa os anúncios nem guarda as palavras do OCR no banco durante a captura")
     p.set_defaults(func=cmd_capturar)
 
     p = sub.add_parser("importar", help="carrega no banco os CSVs de data/ocorrencias/, as contagens "
@@ -179,6 +189,14 @@ def criar_parser():
     p.add_argument("--palavras", type=Path, help="JSON de palavras já pronto: segmenta só ele, sem OCR nem banco")
     p.add_argument("--imagem", type=Path, help="com --palavras: a imagem, para a depuração")
     p.set_defaults(func=cmd_anuncios)
+
+    p = sub.add_parser("palavras", help="envia ao banco as palavras do OCR guardadas em disco, para segmentar "
+                                        "os anúncios sem a imagem")
+    p.add_argument("--subir", action="store_true", required=True,
+                   help="envia as páginas do cache que ainda não têm palavras no banco")
+    p.add_argument("--pasta", type=Path, default=config.OCR_PALAVRAS_DIR,
+                   help=f"cache de palavras (padrão: {config.OCR_PALAVRAS_DIR.relative_to(config.RAIZ)})")
+    p.set_defaults(func=cmd_palavras)
 
     p = sub.add_parser("campos", help="classifica os anúncios (fuga, venda, aluguel...) e extrai sexo, idade, nação, "
                                       "nome etc. (heurístico) e grava no banco")

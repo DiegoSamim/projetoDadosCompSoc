@@ -784,3 +784,107 @@ grant select, insert, update, delete on table public.topico_modelos, public.topi
     to service_role;
 grant select on table public.topicos_por_periodo to service_role;
 grant execute on function public.registrar_topicos(jsonb, jsonb, jsonb) to service_role;
+
+
+-- ============================================================================================
+-- Palavras do OCR com posição, para segmentar anúncios sem a imagem. Nome sugerido da migração:
+-- `palavras_ocr`. Idempotente.
+-- ============================================================================================
+
+create table if not exists public.paginas_palavras (
+    pagina_id  bigint primary key references public.paginas (id) on delete cascade,
+    largura    int,
+    altura     int,
+    palavras_gz text,  -- JSON compacto da lista de palavras (t,x,y,w,h,c,b,p,l) em zlib + base64
+    n_palavras int,
+    criado_em  timestamptz not null default now()
+);
+
+-- Upsert de uma página: regravar substitui as palavras.
+create or replace function public.registrar_palavras(
+    p_pagina_id bigint, p_largura int, p_altura int, p_palavras_gz text, p_n int)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+    insert into public.paginas_palavras (pagina_id, largura, altura, palavras_gz, n_palavras)
+    values (p_pagina_id, p_largura, p_altura, p_palavras_gz, p_n)
+    on conflict (pagina_id) do update set
+        largura = excluded.largura, altura = excluded.altura, palavras_gz = excluded.palavras_gz,
+        n_palavras = excluded.n_palavras, criado_em = now();
+end;
+$$;
+
+alter table public.paginas_palavras enable row level security;
+
+revoke all on table public.paginas_palavras from anon, authenticated;
+revoke all on function public.registrar_palavras(bigint, int, int, text, int) from public, anon, authenticated;
+
+grant select, insert, update, delete on table public.paginas_palavras to service_role;
+grant execute on function public.registrar_palavras(bigint, int, int, text, int) to service_role;
+
+
+-- ============================================================================================
+-- Reserva equilibrada por ano: a cada rodada sai uma página de cada ano ainda disponível (a 1ª
+-- sorteada de cada ano vem antes da 2ª de qualquer ano). Função nova, sem mexer em reservar_paginas.
+-- Nome sugerido da migração: `reservar_equilibradas`. Idempotente.
+-- ============================================================================================
+
+create or replace function public.reservar_paginas_equilibradas(
+    p_quem text,
+    p_limite int,
+    p_bib text default null,
+    p_termo text default null,
+    p_max_tentativas int default 3,
+    p_expira_min int default 30,
+    p_excluir bigint[] default '{}'
+)
+returns table (id bigint, bib text, pagina_fisica int, ano smallint, edicao text, pagina text, link text)
+language sql
+security invoker
+set search_path = ''
+as $$
+    with elegiveis as (
+        select p.id,
+               row_number() over (partition by p.ano order by random()) as rodada
+        from public.paginas p
+        where (p.status = 'pendente'
+               or (p.status = 'erro' and p.etapa_erro = 'captura' and p.tentativas < p_max_tentativas)
+               or (p.status = 'reservada'
+                   and p.reservada_em < now() - make_interval(mins => p_expira_min)))
+          and not (p.id = any(p_excluir))
+          and (p_bib is null or p.bib = p_bib)
+          and (p_termo is null or exists (
+                select 1 from public.ocorrencias o
+                where o.pagina_id = p.id and o.termo = p_termo))
+    ),
+    candidatas as (
+        select e.id from elegiveis e
+        order by e.rodada, random()
+        limit p_limite
+    ),
+    -- A condição de status e p_excluir se repete de propósito: em READ COMMITTED, quem espera o lock
+    -- (skip locked só pula o que está travado agora) enxerga a linha já commitada por outra reserva, e o
+    -- for update não reavalia o filtro do CTE `elegiveis`. Sem repetir, a página seria reservada duas vezes.
+    travadas as (
+        select p.id from public.paginas p
+        where p.id in (select id from candidatas)
+          and (p.status = 'pendente'
+               or (p.status = 'erro' and p.etapa_erro = 'captura' and p.tentativas < p_max_tentativas)
+               or (p.status = 'reservada'
+                   and p.reservada_em < now() - make_interval(mins => p_expira_min)))
+          and not (p.id = any(p_excluir))
+        for update of p skip locked
+    )
+    update public.paginas pg
+    set status = 'reservada', reservada_por = p_quem, reservada_em = now(), atualizado_em = now()
+    from travadas t
+    where pg.id = t.id
+    returning pg.id, pg.bib, pg.pagina_fisica, pg.ano, pg.edicao, pg.pagina, pg.link;
+$$;
+
+revoke all on function public.reservar_paginas_equilibradas(text, int, text, text, int, int, bigint[])
+    from public, anon, authenticated;
+grant execute on function public.reservar_paginas_equilibradas(text, int, text, text, int, int, bigint[]) to service_role;

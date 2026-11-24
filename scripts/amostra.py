@@ -13,6 +13,9 @@ nunca pega as páginas extras, então quem só captura a amostra não é atrapal
 `--complemento` usa a lista COMPLEMENTO: mais dados para quem tem tempo de sobra (variedade de termos, mulheres,
 cores, e um segundo jornal). Vem depois da amostra e dos extras.
 
+`--cobertura` usa a lista COBERTURA: páginas de anos mal cobertos, sorteadas de modo equilibrado por ano (uma de cada
+ano por rodada). O complemento também sai equilibrado por ano. `--extras`, `--complemento` e `--cobertura` não se combinam.
+
 Tudo é retomável: rodar de novo continua de onde parou e não repete páginas.
 """
 import argparse
@@ -28,6 +31,8 @@ from hdb.busca import coletar_ocorrencias, nova_sessao  # noqa: E402
 
 LISTAR_NO_MAXIMO = 200  # ocorrências listadas por célula (a lista sai em ordem de data)
 LISTAR_EXTRAS = 60      # nas células extras, menos: só precisamos de poucas páginas
+LISTAR_COMPLEMENTO = 450  # no complemento, mais: o sorteio equilibrado por ano precisa de páginas de todos os anos
+LISTAR_COBERTURA = None   # na cobertura, lista tudo (None = sem limite)
 
 # (período legal, tipo, bib, acervo, termo, páginas a capturar)
 AMOSTRA = [
@@ -102,13 +107,19 @@ COMPLEMENTO = [
     ("1850–1871",     "fuga",         "217280",    "Correio Mercantil", '"escrav* fugid*"', 6),
 ]
 
+# Cobertura: a meta é o TOTAL de páginas ok da busca (as que já existem contam), e as novas saem equilibradas por ano.
+# 1880s: a lista sai em ordem de data e só havia ~5 páginas de 1880; os outros anos da década ficaram de fora.
+COBERTURA = [
+    ("1871–1888",     "fuga",         "364568_07", "JC 1880s",   '"escravo fugido"',      20),
+]
+
 # quem fica com cada período (planejamento.md, "Quem faz o quê")
 PESSOAS = {1: ["1871–1888"], 2: ["antes de 1831", "1831–1850"], 3: ["1850–1871"]}
 
 
-def celulas(pessoa=None, extras=False, complemento=False):
-    """As células da amostra (ou das EXTRAS ou do COMPLEMENTO), ou só as da pessoa."""
-    lista = COMPLEMENTO if complemento else EXTRAS if extras else AMOSTRA
+def celulas(pessoa=None, extras=False, complemento=False, cobertura=False):
+    """As células da amostra (ou das EXTRAS, do COMPLEMENTO ou da COBERTURA), ou só as da pessoa."""
+    lista = COBERTURA if cobertura else COMPLEMENTO if complemento else EXTRAS if extras else AMOSTRA
     return [c for c in lista if pessoa is None or c[0] in PESSOAS[pessoa]]
 
 
@@ -121,39 +132,48 @@ def andamento(banco):
     return feito
 
 
-def situacao(banco, pessoa=None, extras=False, complemento=False):
+def _anos_ok(banco, bib, termo):
+    """Texto "1880×5, 1886×1" com as páginas ok por ano da busca, ou "nenhum"."""
+    anos = banco.paginas_por_ano(bib, termo)
+    return ", ".join(f"{a}×{d['ok']}" for a, d in sorted(anos.items()) if d["ok"]) or "nenhum"
+
+
+def situacao(banco, pessoa=None, extras=False, complemento=False, cobertura=False):
     feito = andamento(banco)
     print(f"{'período':14} {'tipo':13} {'acervo':11} {'termo':24} {'listadas':>9} {'capturadas':>11}")
     total_ok = total_meta = 0
-    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras, complemento):
+    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras, complemento, cobertura):
         f = feito.get((bib, termo), {})
         ok = min(f.get("ok", 0), meta)
         total_ok, total_meta = total_ok + ok, total_meta + meta
         listadas = f"{f['listadas']}/{f['total']}" if f else "—"
         print(f"{periodo:14} {tipo:13} {acervo:11} {termo:24} {listadas:>9} {f.get('ok', 0):>5} de {meta}")
-    print(f"\nCapturadas: {total_ok} de {total_meta} páginas {'do complemento' if complemento else 'extras' if extras else 'da amostra'}.")
+        if cobertura or complemento:
+            print(f"{'':14} anos ok: {_anos_ok(banco, bib, termo)}")
+    print(f"\nCapturadas: {total_ok} de {total_meta} páginas {'da cobertura' if cobertura else 'do complemento' if complemento else 'extras' if extras else 'da amostra'}.")
 
 
-def listar(banco, pessoa=None, extras=False, complemento=False):
+def listar(banco, pessoa=None, extras=False, complemento=False, cobertura=False):
     sessao = nova_sessao()
-    limite = LISTAR_EXTRAS if extras or complemento else LISTAR_NO_MAXIMO
-    for periodo, tipo, bib, acervo, termo, _ in celulas(pessoa, extras, complemento):
+    limite = (LISTAR_COBERTURA if cobertura else LISTAR_COMPLEMENTO if complemento
+              else LISTAR_EXTRAS if extras else LISTAR_NO_MAXIMO)
+    for periodo, tipo, bib, acervo, termo, _ in celulas(pessoa, extras, complemento, cobertura):
         salvas, total = coletar_ocorrencias(sessao, bib, termo, banco, limite=limite)
         print(f"{periodo:14} {tipo:13} {acervo:11} {termo:24} {salvas} listadas de {total}", flush=True)
 
 
-def capturar(banco, quem, modo, pessoa=None, extras=False, complemento=False):
+def capturar(banco, quem, modo, pessoa=None, extras=False, complemento=False, cobertura=False):
     from hdb.captura import capturar as capturar_paginas
 
     feito = andamento(banco)
-    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras, complemento):
+    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras, complemento, cobertura):
         falta = meta - feito.get((bib, termo), {}).get("ok", 0)
         if falta <= 0:
             continue
         print(f"\n== {periodo} · {tipo} · {acervo} · {termo}: faltam {falta} páginas", flush=True)
         # as imagens ficam em data/amostra porque `hdb anuncios` ainda precisa delas (planejamento, 3.1)
         capturar_paginas(banco, quem, bib=bib, termo=termo, max_paginas=falta, aleatorio=True, modo=modo,
-                         guardar=config.AMOSTRA_DIR)
+                         guardar=config.AMOSTRA_DIR, equilibrar=cobertura or complemento)
 
 
 def main():
@@ -162,16 +182,21 @@ def main():
     p.add_argument("--quem", default=getpass.getuser(), help="quem captura (padrão: usuário do sistema)")
     p.add_argument("--modo", choices=["terminal", "janela"], default="terminal",
                    help="onde a pessoa resolve o CAPTCHA (padrão: terminal)")
-    p.add_argument("--extras", action="store_true", help="usa a lista EXTRAS (dados a mais) em vez da amostra")
-    p.add_argument("--complemento", action="store_true", help="usa a lista COMPLEMENTO (mais dados, para quem tem tempo)")
+    lista = p.add_mutually_exclusive_group()
+    lista.add_argument("--extras", action="store_true", help="usa a lista EXTRAS (dados a mais) em vez da amostra")
+    lista.add_argument("--complemento", action="store_true",
+                       help="usa a lista COMPLEMENTO (mais dados, para quem tem tempo; sorteio equilibrado por ano)")
+    lista.add_argument("--cobertura", action="store_true",
+                       help="usa a lista COBERTURA (anos mal cobertos; sorteio equilibrado por ano)")
     p.add_argument("--pessoa", type=int, choices=sorted(PESSOAS), help="só as células desta pessoa")
     args = p.parse_args()
     banco = BancoSupabase()
     if args.etapa == "listar":
-        listar(banco, args.pessoa, args.extras, args.complemento)
+        listar(banco, args.pessoa, args.extras, args.complemento, args.cobertura)
     elif args.etapa == "capturar":
-        capturar(banco, args.quem, args.modo, args.pessoa, args.extras, args.complemento)
-    situacao(banco, args.pessoa, args.extras, args.complemento)
+        capturar(banco, args.quem, args.modo, args.pessoa, args.extras, args.complemento,
+                  args.cobertura)
+    situacao(banco, args.pessoa, args.extras, args.complemento, args.cobertura)
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@ from pathlib import Path
 
 from hdb import acervos, anuncios, config, layout, ocr
 from hdb.armazenamento import ler_csv_parcial
+from hdb.palavras import comprimir_palavras, descomprimir_palavras  # noqa: F401 (reexportadas)
 
 IFRAME_CAPTCHA = 'iframe[name="CaptchaWnd"]'
 
@@ -215,11 +216,34 @@ def _criar_executor(workers):
     return ProcessPoolExecutor(max_workers=workers, initializer=_ignorar_sigint)
 
 
-def _enviar_ocr(executor, pendentes, pagina, caminho, largura, altura, nbytes, segundos, captchas):
+def _ocr_da_pagina(caminho, bib, pagfis, segmentar):
+    """No processo de OCR: texto da página e, se `segmentar`, o cache das palavras (falha vira `palavras_erro`)."""
+    resultado = ocr.extrair_texto(caminho)
+    if segmentar:
+        try:
+            palavras_da_imagem(caminho, bib, pagfis)
+        except Exception as e:
+            resultado["palavras_erro"] = f"{type(e).__name__}: {e}".splitlines()[0]
+    return resultado
+
+
+def _enviar_ocr(executor, pendentes, pagina, caminho, largura, altura, nbytes, segundos, captchas, segmentar=False):
     """Põe a imagem na fila do OCR; `pendentes` guarda o que falta para gravar o resultado."""
-    futuro = executor.submit(ocr.extrair_texto, str(caminho))
+    futuro = executor.submit(_ocr_da_pagina, str(caminho), pagina["bib"], pagina["pagina_fisica"], segmentar)
     pendentes[futuro] = {"pagina": pagina, "caminho": caminho, "largura": largura, "altura": altura,
-                         "bytes": nbytes, "segundos": segundos, "captchas": captchas}
+                         "bytes": nbytes, "segundos": segundos, "captchas": captchas, "segmentar": segmentar}
+
+
+def _segmentar_sem_derrubar(banco, pagina, caminho, resultado):
+    """Segmenta e grava anúncios e palavras; qualquer falha vira aviso e a página continua ok."""
+    try:
+        erro = resultado.get("palavras_erro")
+        if not erro:
+            segmentar_e_gravar(banco, pagina, caminho)
+    except Exception as e:
+        erro = f"{type(e).__name__}: {e}".splitlines()[0]
+    if erro:
+        print(f"{pagina['bib']} p.{pagina['pagina_fisica']}: aviso, segmentação falhou ({erro}); página mantida")
 
 
 def _gravar_resultado(banco, quem, futuro, info, guardar, apagar):
@@ -242,6 +266,8 @@ def _gravar_resultado(banco, quem, futuro, info, guardar, apagar):
     except Exception as e:  # o banco caiu: a imagem fica em data/tmp/ e é reaproveitada na próxima execução
         print(f"{pagina['bib']} p.{pagina['pagina_fisica']}: falha ao gravar no banco ({e}); imagem mantida")
         return None
+    if info.get("segmentar") and not erro:  # antes de apagar a imagem: o cache das palavras já está em disco
+        _segmentar_sem_derrubar(banco, pagina, caminho, resultado)
     if apagar and erro:
         _mover_para(caminho, config.FALHAS_OCR_DIR)  # não é recapturada: fica para inspeção ou novo OCR local
     elif apagar:
@@ -265,7 +291,7 @@ def _gravar_prontos(banco, quem, pendentes, contagem, guardar, apagar=True, espe
                 contagem[status] += 1
 
 
-def _processar_orfas(banco, quem, executor, pendentes):
+def _processar_orfas(banco, quem, executor, pendentes, segmentar=False):
     """Envia ao OCR as imagens de data/tmp/ que ficaram de execuções interrompidas."""
     for caminho in sorted(config.TMP_DIR.glob("*.jpg")):
         bib, pagfis = pagina_do_tmp(caminho)
@@ -278,7 +304,7 @@ def _processar_orfas(banco, quem, executor, pendentes):
             print(f"{bib} p.{pagfis}: reaproveitando a imagem de uma execução interrompida")
             largura, altura = _tamanho_da_imagem(caminho)
             _enviar_ocr(executor, pendentes, pagina, caminho, largura, altura,
-                        caminho.stat().st_size, 0, 0)
+                        caminho.stat().st_size, 0, 0, segmentar)
 
 
 def _resumo(contagem, captchas):
@@ -288,8 +314,12 @@ def _resumo(contagem, captchas):
 
 
 def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, aleatorio=False,
-             modo="terminal", tamanho=config.TAMANHO_HIRES, workers=config.OCR_WORKERS, guardar=None):
-    """Reserva páginas do banco (até `max_paginas`, em lotes), captura (uma pessoa resolve o CAPTCHA) e faz o OCR."""
+             modo="terminal", tamanho=config.TAMANHO_HIRES, workers=config.OCR_WORKERS, guardar=None,
+             segmentar=True, equilibrar=False):
+    """Reserva páginas do banco (até `max_paginas`, em lotes), captura (uma pessoa resolve o CAPTCHA) e faz o OCR.
+
+    Com `equilibrar`, as páginas saem uma de cada ano por rodada (sorteadas dentro do ano).
+    Com `segmentar`, cada página gravada também tem as palavras e os anúncios gravados (sem derrubar a página se falhar)."""
     from playwright.sync_api import sync_playwright
 
     contagem = {"ok": 0, "erro": 0}
@@ -299,10 +329,11 @@ def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, 
     config.TMP_DIR.mkdir(parents=True, exist_ok=True)
     executor = _criar_executor(workers)
     try:
-        _processar_orfas(banco, quem, executor, pendentes)
+        _processar_orfas(banco, quem, executor, pendentes, segmentar)
         # Termina as órfãs antes de reservar: senão a mesma página (ainda pendente) seria capturada de novo.
         _gravar_prontos(banco, quem, pendentes, contagem, guardar, esperar=True)
-        fila = _paginas_reservadas(banco, quem, max_paginas, [], bib=bib, termo=termo, aleatorio=aleatorio)
+        fila = _paginas_reservadas(banco, quem, max_paginas, [], bib=bib, termo=termo, aleatorio=aleatorio,
+                                 equilibrar=equilibrar)
         primeira = next(fila, None)
         if primeira is None:
             print("Nenhuma página disponível para capturar.")
@@ -332,7 +363,7 @@ def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, 
                     else:
                         total_captchas += captchas
                         _enviar_ocr(executor, pendentes, pagina, caminho_tmp(pagina["bib"], pagfis),
-                                    largura, altura, nbytes, time.monotonic() - inicio, captchas)
+                                    largura, altura, nbytes, time.monotonic() - inicio, captchas, segmentar)
                     _gravar_prontos(banco, quem, pendentes, contagem, guardar)
                     time.sleep(config.PAUSA_CAPTURA)
             finally:
@@ -519,6 +550,15 @@ def segmentar_pagina(dados):
     return {"segmentos": segs, "faixas": faixas, "bordas": bordas, "anuncios": achados, "descartados": descartados}
 
 
+def segmentar_e_gravar(banco, pagina, caminho, versao=config.VERSAO_ANUNCIOS):
+    """Palavras da imagem (cache em disco) -> anúncios e palavras no banco. Devolve o resultado da segmentação."""
+    dados = palavras_da_imagem(caminho, pagina["bib"], pagina["pagina_fisica"])
+    r = segmentar_pagina(dados)
+    banco.registrar_anuncios(pagina["id"], versao, r["anuncios"])
+    banco.registrar_palavras(pagina["id"], dados)
+    return r
+
+
 def desenhar_depuracao(caminho_imagem, dados, resultado, destino, largura=None, regiao=None):
     """PNG da página com as bordas das colunas em vermelho e cada anúncio num retângulo numerado.
 
@@ -569,9 +609,11 @@ def anuncios_do_arquivo(palavras, imagem, depurar=None):
 def anuncios_das_paginas(banco, pastas, versao=config.VERSAO_ANUNCIOS, limite=None, depurar=None,
                          refazer=False):
     """Para cada imagem de `pastas`: palavras (com cache), layout, anúncios; grava no banco se `banco` não é None.
+    Páginas sem imagem mas com palavras no banco são segmentadas a partir delas.
     Pula as páginas que já têm anúncios nessa versão, salvo `refazer`; `limite` conta só as segmentadas."""
     total = puladas = 0
     prontas = banco.paginas_com_anuncios(versao) if banco and not refazer else set()
+    vistas = set()
     for (bib, pagfis), caminho in _imagens_das_pastas(pastas):
         if limite is not None and total >= limite:
             break
@@ -580,6 +622,8 @@ def anuncios_das_paginas(banco, pastas, versao=config.VERSAO_ANUNCIOS, limite=No
         if banco and pagina is None:
             print(f"{nome}: página desconhecida no banco; ignorada")
             continue
+        if pagina:
+            vistas.add(pagina["id"])
         if pagina and pagina["id"] in prontas:
             puladas += 1
             continue
@@ -591,5 +635,31 @@ def anuncios_das_paginas(banco, pastas, versao=config.VERSAO_ANUNCIOS, limite=No
         if depurar:
             desenhar_depuracao(caminho, dados, r, Path(depurar) / f"{bib}_{int(pagfis):05d}.png")
         total += 1
+    for pagina_id in sorted(banco.paginas_com_palavras() - vistas) if banco else []:  # sem imagem: usa o banco
+        if limite is not None and total >= limite:
+            break
+        if pagina_id in prontas:
+            puladas += 1
+            continue
+        r = segmentar_pagina(banco.palavras_da_pagina(pagina_id))
+        banco.registrar_anuncios(pagina_id, versao, r["anuncios"])
+        _resumo_pagina(f"página {pagina_id} (palavras do banco)", r)
+        total += 1
     pulo = f", {puladas} puladas (já tinham anúncios; use --refazer)" if puladas else ""
     print(f"\n{total} páginas segmentadas{pulo}.")
+
+
+def subir_palavras(banco, pasta=None):
+    """Envia ao banco o cache de palavras de `pasta` das páginas conhecidas que ainda não têm. Devolve quantas subiu."""
+    pasta = Path(pasta or config.OCR_PALAVRAS_DIR)
+    tem = banco.paginas_com_palavras()
+    subidas = 0
+    for arquivo in sorted(pasta.glob("*/*.json")):
+        bib, _, pagfis = arquivo.stem.rpartition("_")
+        pagina = banco.pagina(bib, int(pagfis)) if pagfis.isdigit() else None
+        if pagina is None or pagina["id"] in tem:
+            continue
+        banco.registrar_palavras(pagina["id"], json.loads(arquivo.read_text()))
+        subidas += 1
+    print(f"{subidas} páginas com palavras enviadas ao banco.")
+    return subidas
