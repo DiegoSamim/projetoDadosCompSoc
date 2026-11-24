@@ -10,6 +10,8 @@ O plano e o porquê de cada escolha estão em termos_busca.md (seção "O que va
 `--pessoa 1|2|3` limita às células daquela pessoa (divisão em planejamento.md); sem ele, vale a amostra inteira.
 `--extras` troca a amostra pela lista EXTRAS (dados a mais, para os períodos fracos). O `capturar` sem `--extras`
 nunca pega as páginas extras, então quem só captura a amostra não é atrapalhado.
+`--complemento` usa a lista COMPLEMENTO: mais dados para quem tem tempo de sobra (variedade de termos, mulheres,
+cores, e um segundo jornal). Vem depois da amostra e dos extras.
 
 Tudo é retomável: rodar de novo continua de onde parou e não repete páginas.
 """
@@ -70,13 +72,44 @@ EXTRAS = [
     ("antes de 1831", "compra",       "094170_01", "DRJ 1821–58", '"compra-se um preto"',  2),
 ]
 
+# Complemento: para quem terminou a amostra e os extras e tem tempo. Quatro objetivos:
+#   a) mais densidade nos anos 1850–1860, onde cada página rende pouco;
+#   b) mais mulheres (hoje a fuga é quase toda masculina) e ama de leite em mais décadas;
+#   c) variedade de cor e de redação ("parda", "crioula"), além de "preta";
+#   d) um segundo jornal para o mesmo período (última parte da lista), que mostra se o padrão é só do Jornal do Commercio.
+COMPLEMENTO = [
+    ("1850–1871",     "fuga",         "364568_04", "JC 1850s",   '"escravo fugido"',       6),
+    ("1850–1871",     "fuga",         "364568_04", "JC 1850s",   '"preto fugido"',         4),
+    ("1850–1871",     "fuga",         "364568_05", "JC 1860s",   '"escravo fugido"',       6),
+    ("1850–1871",     "fuga",         "364568_05", "JC 1860s",   '"escrava fugida"',       4),
+    ("1850–1871",     "fuga",         "364568_05", "JC 1860s",   '"preto fugido"',         4),
+    ("1850–1871",     "fuga",         "364568_04", "JC 1850s",   '"preta fugida"',         4),
+    ("1871–1888",     "fuga",         "364568_06", "JC 1870s",   '"preta fugida"',         4),
+    ("1831–1850",     "fuga",         "364568_03", "JC 1840s",   '"fugio o preto"',        4),
+    ("1831–1850",     "fuga",         "364568_03", "JC 1840s",   '"fugio o escravo"',      4),
+    ("1850–1871",     "ama de leite", "364568_04", "JC 1850s",   '"escrava com leite"',    4),
+    ("1850–1871",     "ama de leite", "364568_05", "JC 1860s",   '"crioula com leite"',    4),
+    ("1871–1888",     "ama de leite", "364568_06", "JC 1870s",   '"escrava com leite"',    4),
+    ("1831–1850",     "aluguel",      "364568_03", "JC 1840s",   '"aluga-se uma parda"',   4),
+    ("1850–1871",     "aluguel",      "364568_04", "JC 1850s",   '"aluga-se uma parda"',   4),
+    ("1850–1871",     "aluguel",      "364568_05", "JC 1860s",   '"aluga-se uma crioula"', 4),
+    ("1850–1871",     "venda",        "364568_04", "JC 1850s",   '"vende-se uma parda"',   4),
+    ("1850–1871",     "venda",        "364568_05", "JC 1860s",   '"vende-se uma crioula"', 3),
+    ("1850–1871",     "compra",       "364568_04", "JC 1850s",   '"compra-se uma preta"',  4),
+    ("1850–1871",     "compra",       "364568_04", "JC 1850s",   '"compra-se uma escrava"', 4),
+    # segundo jornal, do mesmo período (só vale se o site responder para estes acervos)
+    ("1850–1871",     "fuga",         "094170_02", "DRJ 1860–78", '"escravo fugido"',      6),
+    ("1850–1871",     "fuga",         "217280",    "Correio Mercantil", '"escrav* fugid*"', 6),
+]
+
 # quem fica com cada período (planejamento.md, "Quem faz o quê")
 PESSOAS = {1: ["1871–1888"], 2: ["antes de 1831", "1831–1850"], 3: ["1850–1871"]}
 
 
-def celulas(pessoa=None, extras=False):
-    """As células da amostra (ou das EXTRAS), ou só as da pessoa."""
-    return [c for c in (EXTRAS if extras else AMOSTRA) if pessoa is None or c[0] in PESSOAS[pessoa]]
+def celulas(pessoa=None, extras=False, complemento=False):
+    """As células da amostra (ou das EXTRAS ou do COMPLEMENTO), ou só as da pessoa."""
+    lista = COMPLEMENTO if complemento else EXTRAS if extras else AMOSTRA
+    return [c for c in lista if pessoa is None or c[0] in PESSOAS[pessoa]]
 
 
 def andamento(banco):
@@ -88,32 +121,32 @@ def andamento(banco):
     return feito
 
 
-def situacao(banco, pessoa=None, extras=False):
+def situacao(banco, pessoa=None, extras=False, complemento=False):
     feito = andamento(banco)
     print(f"{'período':14} {'tipo':13} {'acervo':11} {'termo':24} {'listadas':>9} {'capturadas':>11}")
     total_ok = total_meta = 0
-    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras):
+    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras, complemento):
         f = feito.get((bib, termo), {})
         ok = min(f.get("ok", 0), meta)
         total_ok, total_meta = total_ok + ok, total_meta + meta
         listadas = f"{f['listadas']}/{f['total']}" if f else "—"
         print(f"{periodo:14} {tipo:13} {acervo:11} {termo:24} {listadas:>9} {f.get('ok', 0):>5} de {meta}")
-    print(f"\nCapturadas: {total_ok} de {total_meta} páginas {'extras' if extras else 'da amostra'}.")
+    print(f"\nCapturadas: {total_ok} de {total_meta} páginas {'do complemento' if complemento else 'extras' if extras else 'da amostra'}.")
 
 
-def listar(banco, pessoa=None, extras=False):
+def listar(banco, pessoa=None, extras=False, complemento=False):
     sessao = nova_sessao()
-    limite = LISTAR_EXTRAS if extras else LISTAR_NO_MAXIMO
-    for periodo, tipo, bib, acervo, termo, _ in celulas(pessoa, extras):
+    limite = LISTAR_EXTRAS if extras or complemento else LISTAR_NO_MAXIMO
+    for periodo, tipo, bib, acervo, termo, _ in celulas(pessoa, extras, complemento):
         salvas, total = coletar_ocorrencias(sessao, bib, termo, banco, limite=limite)
         print(f"{periodo:14} {tipo:13} {acervo:11} {termo:24} {salvas} listadas de {total}", flush=True)
 
 
-def capturar(banco, quem, modo, pessoa=None, extras=False):
+def capturar(banco, quem, modo, pessoa=None, extras=False, complemento=False):
     from hdb.captura import capturar as capturar_paginas
 
     feito = andamento(banco)
-    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras):
+    for periodo, tipo, bib, acervo, termo, meta in celulas(pessoa, extras, complemento):
         falta = meta - feito.get((bib, termo), {}).get("ok", 0)
         if falta <= 0:
             continue
@@ -130,14 +163,15 @@ def main():
     p.add_argument("--modo", choices=["terminal", "janela"], default="terminal",
                    help="onde a pessoa resolve o CAPTCHA (padrão: terminal)")
     p.add_argument("--extras", action="store_true", help="usa a lista EXTRAS (dados a mais) em vez da amostra")
+    p.add_argument("--complemento", action="store_true", help="usa a lista COMPLEMENTO (mais dados, para quem tem tempo)")
     p.add_argument("--pessoa", type=int, choices=sorted(PESSOAS), help="só as células desta pessoa")
     args = p.parse_args()
     banco = BancoSupabase()
     if args.etapa == "listar":
-        listar(banco, args.pessoa, args.extras)
+        listar(banco, args.pessoa, args.extras, args.complemento)
     elif args.etapa == "capturar":
-        capturar(banco, args.quem, args.modo, args.pessoa, args.extras)
-    situacao(banco, args.pessoa, args.extras)
+        capturar(banco, args.quem, args.modo, args.pessoa, args.extras, args.complemento)
+    situacao(banco, args.pessoa, args.extras, args.complemento)
 
 
 if __name__ == "__main__":
