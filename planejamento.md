@@ -33,26 +33,27 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 
 ## Situação em 23/11 e plano para terminar hoje
 
-### O que os dados mostram (atualizado em 23/11, à noite)
+### O que os dados mostram (atualizado em 24/11, depois da segmentação e do `c3`)
 
 | | Hoje | Meta |
 |---|---|---|
-| Páginas capturadas (amostra completa: **69 de 69**) | **108** | amostra + extras + complemento |
-| Páginas com anúncios separados | **59 de 108** | todas |
-| Anúncios de pessoas escravizadas (tipo ≠ outro) | **676** | pelo menos 100 por período legal |
+| Páginas capturadas (amostra completa: **69 de 69**) | **158** | amostra + extras + complemento |
+| Páginas com anúncios separados | **109 de 158** (faltam 49, só na outra máquina) | todas |
+| Anúncios de pessoas escravizadas (tipo ≠ outro, campos `c3`) | **768** | pelo menos 100 por período legal |
+| Anúncios no corpus (`hdb corpus`, versão `corp1`) | **717** | |
 
-**Anúncios relevantes por período (das 59 páginas já separadas):**
+**Anúncios relevantes por período (campos `c3`):**
 
 | Período | Relevantes | Fuga | Venda | Aluguel | Ama de leite | Compra | Situação |
 |---|---:|---:|---:|---:|---:|---:|---|
-| antes de 1831 | **28** | 28 | 0 | 0 | 0 | 0 | **fraco** (só fuga; 15 páginas do JC 1827–29 ainda sem separar) |
-| 1831–1850 | 136 | 26 | 54 | 35 | 18 | 3 | ok (18 páginas do JC 1830s ainda sem separar) |
-| 1850–1871 | 203 | 34 | 51 | 93 | 22 | 3 | ok (16 páginas do JC 1860s ainda sem separar) |
-| 1871–1888 | 309 | 33 | 58 | **201** | 13 | 4 | ok em volume; **fuga fraca e aluguel a conferir** |
+| antes de 1831 | **106** | 63 | 24 | 7 | 12 | 0 | ok em volume; 15 páginas do JC 1827–29 ainda sem separar |
+| 1831–1850 | 136 | 26 | 50 | 35 | 20 | 5 | ok (18 páginas do JC 1830s ainda sem separar) |
+| 1850–1871 | 220 | 52 | 54 | 89 | 23 | 2 | ok (16 páginas do JC 1860s ainda sem separar) |
+| 1871–1888 | 306 | 48 | 60 | **181** | 13 | 4 | ok em volume; **aluguel ainda a conferir** |
 
 **O que isso quer dizer:**
 
-1. **A separação das 49 páginas novas continua pendente** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). A separação precisa da imagem, e essas imagens estão no computador de quem capturou. É o que mais muda os números, sobretudo "antes de 1831".
+1. **A separação das 49 páginas restantes continua pendente** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). A separação precisa da imagem, e essas imagens estão no computador de quem capturou. É o que mais muda os números, sobretudo "antes de 1831".
 2. **Corrigi uma estimativa:** eu tinha previsto cerca de 4 anúncios por página nos anos 1870. A medida real é **18 por página** (325 anúncios em 18 páginas). Os anos 1860 e 1880 continuam baixos (cerca de 4 por página), então a baixa densidade não é regra das décadas tardias.
 3. **Anúncios repetidos são raros nesta amostra:** só cerca de 0,5% repetem o início do texto. O risco existe, mas é pequeno enquanto as páginas forem sorteadas. Tratar duplicatas deixa de ser urgente.
 4. **Pendências de qualidade:** 201 "aluguéis" em 1871–1888 é um número alto e **não foi conferido**; pode haver anúncios de aluguel de outra coisa classificados como de pessoas. Também há 56 anúncios com menos de 60 caracteres (fragmentos).

@@ -63,6 +63,12 @@ def cmd_campos(args):
     print(formatar_resumo(processar(_banco(), args.versao_anuncios, args.versao, args.limite)))
 
 
+def cmd_corpus(args):
+    from hdb.corpus import formatar_resumo, processar
+
+    print(formatar_resumo(processar(_banco(), args.versao_campos, args.versao)))
+
+
 def cmd_acervos(args):
     from hdb.acervos import descobrir_acervos
 
@@ -176,6 +182,14 @@ def criar_parser():
                    help=f"versão da extração; regravar a mesma substitui (padrão: {config.VERSAO_CAMPOS})")
     p.add_argument("--limite", type=int, help="máximo de anúncios (padrão: todos)")
     p.set_defaults(func=cmd_campos)
+
+    p = sub.add_parser("corpus", help="seleciona os anúncios de pessoas escravizadas e grava o texto padronizado "
+                                      "(para a modelagem de tópicos) ao lado do original")
+    p.add_argument("--versao-campos", default=config.VERSAO_CAMPOS,
+                   help=f"versão dos campos (tipo) a usar na seleção (padrão: {config.VERSAO_CAMPOS})")
+    p.add_argument("--versao", default=config.VERSAO_CORPUS,
+                   help=f"versão do corpus; regravar a mesma substitui (padrão: {config.VERSAO_CORPUS})")
+    p.set_defaults(func=cmd_corpus)
 
     p = sub.add_parser("acervos", help="descobre os periódicos de um estado e década na HDB e grava o código (bib) "
                                        "de cada um")

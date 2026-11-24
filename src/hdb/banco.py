@@ -46,6 +46,17 @@ def cobre_mais_que_a_decada(periodo, ano_inicio, ano_fim):
     return ano_inicio < decada[0] or ano_fim > decada[1]
 
 
+def periodo_legal_do_ano(ano):
+    """Período legal de um ano, como a view `anuncios_completos` (por ano; 1831, 1850 e 1871 abrem o período seguinte)."""
+    if ano is None:
+        return None
+    for limite, nome in ((1831, "antes de 1831"), (1850, "1831–1850 (Feijó → Eusébio)"),
+                         (1871, "1850–1871 (Eusébio → Ventre Livre)"), (1889, "1871–1888 (Ventre Livre → Áurea)")):
+        if ano < limite:
+            return nome
+    return "depois de 1888"
+
+
 def _todas(consulta, tamanho=1000):
     """Todas as linhas de uma consulta ordenada; a API devolve no máximo 1000 por chamada."""
     linhas, inicio = [], 0
@@ -154,6 +165,15 @@ class BancoSupabase:
         """Grava (upsert por anúncio e versão) as linhas [{anuncio_id, tipo, ...}]. Devolve quantas."""
         return self._rpc("registrar_campos", p_versao=versao, p_campos=campos)
 
+    def anuncios_para_corpus(self, versao_campos):
+        """Anúncios com campos dessa versão como [{id, texto, confianca, ano, periodo_legal, c_tipo}], por id."""
+        return _todas(self.cliente.table("anuncios_completos").select("id,texto,confianca,ano,periodo_legal,c_tipo")
+                      .eq("c_versao", versao_campos).order("id"))
+
+    def registrar_corpus(self, versao, linhas):
+        """Grava (upsert por anúncio e versão) as linhas [{anuncio_id, texto_padrao, n_palavras}]. Devolve quantas."""
+        return self._rpc("registrar_corpus", p_versao=versao, p_linhas=linhas)
+
     def registrar_erro(self, pagina_id, quem, etapa, erro, segundos, captchas):
         self._rpc("registrar_erro", p_pagina_id=pagina_id, p_quem=quem, p_etapa=etapa,
                   p_erro=erro, p_segundos=segundos, p_captchas=captchas)
@@ -223,6 +243,7 @@ class BancoMemoria:
         self.tentativas = []
         self.lista_anuncios = {}  # (pagina_id, versao) -> lista de dicts
         self.campos = {}  # (anuncio_id, versao) -> dict
+        self.corpus = {}  # (anuncio_id, versao) -> dict
         self.proximo_anuncio = 1
         self.dados_acervos = {}  # bib -> {ano_inicio, ano_fim, total_paginas}
         self.periodos = {}  # (local, periodo, posicao) -> {nome_lista, bib, erro}
@@ -332,6 +353,22 @@ class BancoMemoria:
         for c in campos:
             self.campos[(c["anuncio_id"], versao)] = {**c, "versao": versao, "criado_em": self.agora()}
         return len(campos)
+
+    def anuncios_para_corpus(self, versao_campos):
+        achados = []
+        for (pagina_id, _), lista in self.lista_anuncios.items():
+            ano = self.paginas.get(pagina_id, {}).get("ano")
+            for a in lista:
+                c = self.campos.get((a["id"], versao_campos))
+                if c is not None:
+                    achados.append({"id": a["id"], "texto": a.get("texto"), "confianca": a.get("confianca"), "ano": ano,
+                                    "periodo_legal": periodo_legal_do_ano(ano), "c_tipo": c.get("tipo")})
+        return sorted(achados, key=lambda a: a["id"])
+
+    def registrar_corpus(self, versao, linhas):
+        for l in linhas:
+            self.corpus[(l["anuncio_id"], versao)] = {**l, "versao": versao, "criado_em": self.agora()}
+        return len(linhas)
 
     def registrar_erro(self, pagina_id, quem, etapa, erro, segundos, captchas):
         p = self.paginas[pagina_id]

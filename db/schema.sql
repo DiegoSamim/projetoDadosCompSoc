@@ -449,7 +449,7 @@ create table if not exists public.anuncio_campos (
     idade_max  smallint,
     nacoes     text[],
     cores      text[],
-    condicao   text,  -- escravizado, forro, livre
+    condicao   text,  -- escravizado, forro, livre, desconhecida (venda/compra/aluguel/ama sem pista da condição)
     nomes      text[],
     oficios    text[],
     recompensa boolean,
@@ -651,3 +651,46 @@ $$;
 
 revoke all on function public.relatorio_coleta() from public, anon, authenticated;
 grant execute on function public.relatorio_coleta() to service_role;
+
+
+-- ============================================================================================
+-- Corpus para a modelagem de tópicos (hdb.corpus). Nome sugerido da migração: `corpus_anuncios`. Idempotente.
+-- ============================================================================================
+
+-- Texto padronizado (minúsculas, grafia atual, sem números e palavras vazias) ao lado do original, por versão.
+create table if not exists public.anuncio_corpus (
+    anuncio_id  bigint not null references public.anuncios (id) on delete cascade,
+    versao      text   not null,
+    texto_padrao text,
+    n_palavras  int,
+    criado_em   timestamptz not null default now(),
+    primary key (anuncio_id, versao)
+);
+
+-- Upsert em lote: p_linhas = [{anuncio_id, texto_padrao, n_palavras}, ...]. Devolve quantas linhas gravou.
+create or replace function public.registrar_corpus(p_versao text, p_linhas jsonb)
+returns int
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+    gravados int;
+begin
+    insert into public.anuncio_corpus (anuncio_id, versao, texto_padrao, n_palavras)
+    select l.anuncio_id, p_versao, l.texto_padrao, l.n_palavras
+    from jsonb_to_recordset(p_linhas) as l(anuncio_id bigint, texto_padrao text, n_palavras int)
+    on conflict (anuncio_id, versao) do update set
+        texto_padrao = excluded.texto_padrao, n_palavras = excluded.n_palavras, criado_em = now();
+    get diagnostics gravados = row_count;
+    return gravados;
+end;
+$$;
+
+alter table public.anuncio_corpus enable row level security;
+
+revoke all on table public.anuncio_corpus from anon, authenticated;
+revoke all on function public.registrar_corpus(text, jsonb) from public, anon, authenticated;
+
+grant select, insert, update, delete on table public.anuncio_corpus to service_role;
+grant execute on function public.registrar_corpus(text, jsonb) to service_role;

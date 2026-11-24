@@ -85,8 +85,12 @@ LIXO_CONFIANCA = 25  # segmento com confiança média menor que isto é lixo do 
 LIXO_LETRAS = 0.4  # segmento com menos letras que esta fração dos caracteres é lixo (exceto título)
 CABECALHO = 0.025  # fração do topo da página onde número ou caixa alta é cabeçalho
 RODAPE = 0.03  # idem, na base
-VERSAO_CAMPOS = "c2"  # versão da extração de campos (hdb.campos); muda quando as heurísticas mudam
+VERSAO_CAMPOS = "c3"  # versão da extração de campos (hdb.campos); muda quando as heurísticas mudam
 LOTE_CAMPOS = 500  # campos gravados por chamada ao banco
+VERSAO_CORPUS = "corp1"  # versão do texto padronizado (hdb.corpus); muda quando a padronização ou a seleção mudam
+LOTE_CORPUS = 500  # linhas do corpus gravadas por chamada ao banco
+CORPUS_CONFIANCA_MIN = 50  # confiança mínima do OCR para o anúncio entrar no corpus
+CORPUS_PALAVRAS_MIN = 8  # anúncios com menos palavras são pedaços, não anúncios inteiros
 VERSAO_ANUNCIOS = "v2"  # versão da segmentação em anúncios; muda quando as heurísticas mudam
 DEPURACAO_LARGURA = 900  # px de largura dos PNGs de depuração
 

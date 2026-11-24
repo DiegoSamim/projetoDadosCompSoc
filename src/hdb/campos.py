@@ -11,6 +11,7 @@ from hdb.config import LOTE_CAMPOS, VERSAO_CAMPOS
 from hdb.anuncios import achar_abertura, achar_numeracao, distancia, e_secao
 
 TIPOS = ("fuga", "venda", "compra", "aluguel", "ama_de_leite", "outro")
+TIPOS_DE_PESSOA = ("venda", "compra", "aluguel", "ama_de_leite")  # tipos em que a condição pode ser "desconhecida"
 
 IDADE_MAXIMA = 90
 NACAO_ERROS = 1  # erros de OCR tolerados no nome de uma nação
@@ -61,7 +62,12 @@ DETERMINANTES = {
 CONTEXTO_DEPOIS = re.compile(
     r"\b(?:de\s+\d{1,2}\b|\d{1,2}\s*a[nu]{1,2}[o0]s|por\s+nome|de\s+nome|de\s+nacao|nacao|que\s+sab[eh]|"
     r"que\s+tem|official\s+de)")
-SRA = re.compile(r"\b(?:huma|uma)\s+(?:sra|senhora)\b")  # "ALUGA-SE huma Sra. branca": gente, sem sexo próprio
+SRA = re.compile(r"\b(?:huma|uma)\s+(?:sra|senhora)\b")  # "ALUGA-SE uma senhora portugueza": gente livre
+JANELA_PESSOA = 200  # caracteres iniciais onde a pessoa anunciada tem de aparecer (ver `_motivo_de_outro`)
+NACIONALIDADE_LIVRE = re.compile(  # quem é "portuguez", "ingleza"... num anúncio de negócio é gente livre, não escravizada
+    r"\b(?:portugue[sz]a?s?|ingle[sz]a?s?|franc[ae][sz]a?s?|alle?m[aã]o?e?s?|italian[oa]s?|"
+    r"hespanh[oa]l[a]?s?|pessoa\s+livre)\b")
+MARCA_ESCRAVIZADO = re.compile(r"\b(?:moleque|molecote|moleca|molecota)s?\b")  # além de cores, escravo, forro
 NAVIO = re.compile(r"\bequip\w*\.?\s*\d|\bpassag\w*\.?\s*\d|\bcarga\b")  # movimento de porto, "1 escravo" passageiro
 ACHAR = re.compile(r"\bquem\s*[oa]?\s*(?:o\s+|a\s+)?(?:achar|apprehender|pegar|prender|capturar|trouxer)")
 LEITE = re.compile(r"\bama\s+(?:de|com)\s+leite\b|\b(?:com|de)\s+leite\b")
@@ -211,6 +217,30 @@ def _achar_com_premio(norm):
     return bool(ACHAR.search(norm) and RECOMPENSA.search(norm) and any(_singular(r) in PESSOAS for r, _, _ in _tokens(norm)))
 
 
+def _marca_de_escravizado(norm):
+    """Há cor, "escravo", forro ou "moleque" no texto: palavra que só se diz de pessoa escravizada ou egressa."""
+    return bool(ESCRAVIZADO.search(norm) or FORRO.search(norm) or MARCA_ESCRAVIZADO.search(norm)
+                or any(p in CORES for p, _, _ in _palavras(norm)))
+
+
+def _motivo_de_outro(norm):
+    """Por que um venda/compra/aluguel não é de pessoa escravizada (vira "outro"), ou None se segue valendo.
+
+    1. Sem palavra de pessoa nos primeiros JANELA_PESSOA caracteres ("ALUGA-SE uma sala para escriptorio"). Só o
+       começo: o OCR cola anúncios vizinhos, e uma pessoa que só aparece depois é do anúncio seguinte, não deste
+       ("VENDE-SE a casa terrea... " + "huma preta de 20 annos"); 200 caracteres cobrem um anúncio curto inteiro.
+    2. Marcador de pessoa livre (nacionalidade, "pessoa livre", "senhora", "moça livre") sem nenhuma marca de
+       escravizado ou cor ("aluga-se uma senhora portugueza").
+    """
+    inicio = norm[:JANELA_PESSOA]
+    if not _pessoas(inicio):
+        return "sem palavra de pessoa nos primeiros 200 caracteres"
+    livre = NACIONALIDADE_LIVRE.search(inicio) or SRA.search(inicio) or LIVRE.search(inicio)
+    if livre and not _marca_de_escravizado(inicio):
+        return f"pessoa livre ({livre.group().strip()}) sem marca de escravizado"
+    return None
+
+
 def _tipo_do_negocio(verbo, norm):
     """(tipo, procura) de venda/compra/aluguel; "precisa" olha se pede alugar ou comprar."""
     if verbo != "precisa":
@@ -221,36 +251,45 @@ def _tipo_do_negocio(verbo, norm):
 
 
 def classificar(anuncio):
-    """(tipo, procura) do anúncio.
+    """(tipo, procura) do anúncio; `_classificar` também dá o motivo de um venda/compra/aluguel virar "outro".
 
     Precedência: 1. título/seção de fuga; 2. abertura de fuga; 3. sem verbo de negócio: movimento de porto
     ("equip. 6 ... carga") é outro; 4. sem verbo de negócio: palavras de fuga no texto, ou "quem achar ... gratificado"
     com gente (para "VENDE-SE ... não fugio" não virar fuga; aviso numerado "N." precisa delas); 5. fala de pessoa
     (palavra de pessoa com contexto de pessoa; "seda preta" não vale); 6. ama de leite (vale mesmo com
-    ALUGA-SE/VENDE-SE); 7. venda/compra/aluguel; 8. outro. `procura` é o lado da demanda (quem anuncia quer obter alguém): True para COMPRA-SE e PRECISA-SE
+    ALUGA-SE/VENDE-SE); 7. venda/compra/aluguel, só com pessoa escravizável no começo do anúncio (c3; ver
+    `_motivo_de_outro`); 8. outro. `procura` é o lado da demanda (quem anuncia quer obter alguém): True para COMPRA-SE e PRECISA-SE
     (alugar, comprar ou só pessoa); False para VENDE-SE, ALUGA-SE e OFFERECE-SE.
     """
+    tipo, procura, _ = _classificar(anuncio)
+    return tipo, procura
+
+
+def _classificar(anuncio):
+    """(tipo, procura, motivo): motivo só quando venda/compra/aluguel virou "outro"."""
     texto = anuncio.get("texto") or ""
     norm = _simples(texto)
     abertura = anuncio.get("abertura") or achar_abertura(texto) or achar_numeracao(texto)
     verbo = _verbo(abertura, norm)
     if _titulo_de_fuga(anuncio.get("titulo")) or verbo == "fuga":
-        return "fuga", False
+        return "fuga", False, None
     if verbo is None and NAVIO.search(norm):
-        return "outro", False
+        return "outro", False, None
     if verbo is None and (_tem_palavra_de_fuga(norm) or _achar_com_premio(norm)
                           or (abertura == "N." and _fugio_mal_lido(norm))):
-        return "fuga", False
-    if not (_pessoas(norm) or SRA.search(norm)):
-        return "outro", False
+        return "fuga", False, None
     if verbo is None:  # abertura "N." ou nenhuma: o verbo pode estar no meio do texto
         verbo = _verbo(None, norm)
+    if not _pessoas(norm):  # com verbo de negócio, o motivo fica na evidência
+        return "outro", False, _motivo_de_outro(norm) if verbo else None
     procura = verbo in ("precisa", "compra")
     if LEITE.search(norm):
-        return "ama_de_leite", procura
+        return "ama_de_leite", procura, None
     if verbo is None:
-        return "outro", False
-    return _tipo_do_negocio(verbo, norm)
+        return "outro", False, None
+    tipo, procura = _tipo_do_negocio(verbo, norm)
+    motivo = _motivo_de_outro(norm)
+    return ("outro", False, motivo) if motivo else (tipo, procura, None)
 
 
 # --- extração ---
@@ -339,7 +378,7 @@ def _cores(texto, norm):
 
 
 def _condicao(texto, norm):
-    """('escravizado' | 'forro' | 'livre' | None, trecho). Forro vence escravo, que vence livre."""
+    """('escravizado' | 'forro' | 'livre' | None, trecho); "desconhecida" é posto por `extrair_anuncio`. Forro vence escravo, que vence livre."""
     for padrao, valor in ((FORRO, "forro"), (ESCRAVIZADO, "escravizado"), (LIVRE, "livre")):
         m = padrao.search(norm)
         if m:
@@ -419,8 +458,13 @@ def extrair(texto):
 
 def extrair_anuncio(anuncio):
     """`classificar` e `extrair` num dict só (tipo, procura, campos..., versao)."""
-    tipo, procura = classificar(anuncio)
-    return {"tipo": tipo, "procura": procura, **extrair(anuncio.get("texto")), "versao": VERSAO_CAMPOS}
+    tipo, procura, motivo = _classificar(anuncio)
+    campos = extrair(anuncio.get("texto"))
+    if motivo:
+        campos["evidencias"]["tipo"] = motivo
+    if tipo in TIPOS_DE_PESSOA and not campos["condicao"]:
+        campos["condicao"] = "desconhecida"  # "rapariga", "ama preta": nada diz se é escravizada, forra ou livre
+    return {"tipo": tipo, "procura": procura, **campos, "versao": VERSAO_CAMPOS}
 
 
 # --- orquestração: lê os anúncios do banco, extrai e grava ---

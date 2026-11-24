@@ -81,9 +81,9 @@ def test_campos_dos_anuncios_reais():
     assert extrair(T6)["endereco"] == "rua da Misericordia n, 6"
 
 
-def test_condicao_livre_e_aluguel_de_sra_branca():
+def test_condicao_livre_e_sra_branca_nao_e_aluguel_de_escravizada():
     assert extrair(T13)["condicao"] == "livre"
-    assert classificar({"texto": T13, "abertura": "ALUGA-SE"}) == ("aluguel", False)
+    assert classificar({"texto": T13, "abertura": "ALUGA-SE"}) == ("outro", False)  # c3: sem palavra de pessoa
 
 
 @pytest.mark.parametrize("texto", NEGATIVOS)
@@ -305,3 +305,69 @@ def test_sexo_ambos_so_com_pessoas_dos_dois_sexos():
 def test_pre_nao_pega_preco_nem_preste():
     assert classificar({"texto": "PREÇO barato, vende-se"})[0] == "outro"
     assert classificar({"texto": "PRESTE atenção a esta preta"})[0] == "outro"
+
+
+# --- c3: venda/compra/aluguel só com pessoa escravizável; condição "desconhecida" ---
+
+def c3(texto, abertura):
+    return extrair_anuncio({"texto": texto, "abertura": abertura})
+
+
+def test_versao_c3():
+    assert VERSAO_CAMPOS == "c3"
+
+
+@pytest.mark.parametrize("texto,abertura", [
+    ("ALUGA-SE huma sala para escriptorio, na rua do Ouvidor n. 12.", "ALUGA-SE"),
+    ("ALUGA-SE huma loja com armazem; na rua da Quitanda n. 4.", "ALUGA-SE"),
+    ("ALUGA-SE huma casa terrea com quintal, propria para familia; na rua do Cattete n. 9.", "ALUGA-SE"),
+    ("VENDE-SE a casa terrea da rua Larga n. 3, com sala e cozinha.", "VENDE-SE"),
+    ("COMPRA-SE hum sitio perto da cidade; quem tiver diga na rua da Alfandega n. 8.", "COMPRA-SE"),
+])
+def test_c3_sem_pessoa_vira_outro(texto, abertura):
+    r = c3(texto, abertura)
+    assert (r["tipo"], r["procura"]) == ("outro", False)
+    assert "pessoa" in r["evidencias"]["tipo"] and r["condicao"] is None
+
+
+def test_c3_pessoa_so_no_anuncio_colado_depois_da_janela_vira_outro():
+    colado = "VENDE-SE a casa terrea da rua Larga n. 3, com sala e cozinha. " + "x " * 100 + "huma preta de 20 annos"
+    assert c3(colado, "VENDE-SE")["tipo"] == "outro"
+    assert c3("VENDE-SE huma preta de 20 annos. " + "x " * 100, "VENDE-SE")["tipo"] == "venda"
+
+
+def test_c3_senhora_portugueza_e_pessoa_livre():
+    r = c3("ALUGA-SE huma senhora portugueza, para ama de casa de pouca familia; na rua do Hospicio n. 3.", "ALUGA-SE")
+    assert r["tipo"] == "outro" and r["evidencias"]["tipo"]
+    r = c3("ALUGA-SE huma menina portugueza para pagem de casa; na rua do Hospicio n. 3.", "ALUGA-SE")
+    assert r["tipo"] == "outro" and "livre" in r["evidencias"]["tipo"]
+    assert c3("PRECISA-SE huma ingleza para ama de crianças", "PRECISA-SE")["tipo"] == "outro"
+    assert c3("ALUGA-SE huma moça livre que cozinha", "ALUGA-SE")["tipo"] == "outro"
+
+
+def test_c3_marca_de_cor_vence_o_marcador_de_livre():
+    r = c3("ALUGA-SE huma preta que falla francez, cozinha e lava", "ALUGA-SE")
+    assert r["tipo"] == "aluguel"
+
+
+def test_c3_aluga_preta_e_aluguel_de_mulher_com_condicao_desconhecida():
+    r = c3("ALUGA-SE huma preta que cozinha e lava; na rua do Senado n. 5.", "ALUGA-SE")
+    assert (r["tipo"], r["sexo"], r["condicao"]) == ("aluguel", "f", "desconhecida")
+
+
+def test_c3_rapariga_e_ama_nao_dizem_a_condicao():
+    r = c3("ALUGA-SE huma rapariga para casa de pouca familia; na rua do Lavradio n. 7.", "ALUGA-SE")
+    assert (r["tipo"], r["sexo"], r["condicao"]) == ("aluguel", "f", "desconhecida")
+    r = c3("ALUGA-SE huma ama de leite do primeiro parto", "ALUGA-SE")
+    assert (r["tipo"], r["condicao"]) == ("ama_de_leite", "desconhecida")
+
+
+def test_c3_venda_de_negrinha_e_condicao_explicita_continua():
+    r = c3("VENDE-SE huma linda negrinha de 13 annos", "VENDE-SE")
+    assert (r["tipo"], r["sexo"]) == ("venda", "f")
+    assert c3(T12, None)["condicao"] == "escravizado" and c3(T3, "ALUGA-SE")["condicao"] == "forro"
+
+
+def test_c3_fuga_e_outro_nao_ganham_desconhecida():
+    assert c3(T9, "N.")["condicao"] is None
+    assert c3("ALUGA-SE huma sala", "ALUGA-SE")["condicao"] is None
