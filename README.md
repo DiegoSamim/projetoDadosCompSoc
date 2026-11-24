@@ -46,14 +46,14 @@ git push
 | 1. busca (metadados e links das ocorrências) | `src/hdb/busca.py` | pronta, grava no banco, com retomada e testes |
 | 2. captura (imagem da página) | `src/hdb/captura.py` | funciona contra o site, com uma pessoa resolvendo o CAPTCHA; fila de páginas no banco |
 | 3. OCR | `src/hdb/ocr.py` | implementada (Tesseract, em tons de cinza, com escada de resolução); falta medir em volume |
-| banco | `db/schema.sql`, `src/hdb/banco.py` | aplicado no Supabase (9 tabelas, as views `textos_atuais`, `panorama` e `anuncios_completos` e as funções) |
-| 4. segmentação em anúncios | `src/hdb/layout.py`, `src/hdb/anuncios.py`, `hdb anuncios` | heurística pronta, com testes; a qualidade só se confirma olhando as páginas |
+| banco | `db/schema.sql`, `src/hdb/banco.py` | esquema com 14 tabelas e 4 views (`textos_atuais`, `panorama`, `anuncios_completos`, `topicos_por_periodo`), mais as funções; inclui as tabelas de corpus, tópicos e palavras do OCR |
+| 4. segmentação em anúncios | `src/hdb/layout.py`, `src/hdb/anuncios.py`, `hdb anuncios` | heurística pronta, com testes; a captura já segmenta, e `anuncios` pula as páginas já separadas (`--refazer` reprocessa); a qualidade só se confirma olhando as páginas |
 | panorama de acervos | `src/hdb/acervos.py`, `hdb acervos`, `hdb panorama` | pronto; panorama do RJ 1850–1859 completo (186 periódicos) |
-| campos dos anúncios | `src/hdb/campos.py`, `hdb campos` | pronto (versão `c2`, heurística); falta conferir amostra |
+| campos dos anúncios | `src/hdb/campos.py`, `hdb campos` | pronto (versão `c4`, heurística); falta conferir amostra |
 | relatório metodológico | `src/hdb/relatorio.py`, `hdb relatorio` | pronto |
-| amostra do grupo | `scripts/amostra.py` | plano decidido (69 páginas, 5 tipos × 4 períodos); falta listar e capturar |
-| 5. corpus padronizado | `hdb corpus` (a fazer) | não iniciada; plano em [linguagem_natural.md](linguagem_natural.md) |
-| 6. modelagem de tópicos | `hdb topicos` (a fazer) | não iniciada; plano em [linguagem_natural.md](linguagem_natural.md) |
+| amostra do grupo | `scripts/amostra.py` | amostra completa (69 de 69) e extras (47 de 47); complemento (5 de 91) e cobertura de 1886–1888 em andamento |
+| 5. corpus padronizado | `src/hdb/corpus.py`, `hdb corpus` | pronto (versão `corp2`); plano e regras em [linguagem_natural.md](linguagem_natural.md) |
+| 6. modelagem de tópicos | `src/hdb/topicos.py`, `hdb topicos` | pronto (LDA; `t2` com 8 tópicos e `t3` com 6); estabilidade em `scripts/estabilidade_topicos.py`; notebooks em [notebooks/](notebooks/) |
 | avaliação do OCR | `src/hdb/avaliacao.py` | opcional (exige transcrição à mão) |
 
 Testes (sem rede, sem navegador e sem Supabase): `python -m pytest`.
@@ -83,17 +83,26 @@ Comandos (a partir da raiz, com `PYTHONPATH=src`):
 python -m hdb buscar --bib 364568_04 --termo fugido --limite 150
 python -m hdb capturar --bib 364568_04 --max-paginas 100
 python -m hdb capturar --modo janela --workers 2 --guardar-imagens ~/imagens
+python -m hdb capturar --equilibrar --max-paginas 30
 python -m hdb importar
 python -m hdb reprocessar --limite 20
 python -m hdb anuncios --limite 5 --depurar data/depuracao
+python -m hdb anuncios --refazer
+python -m hdb palavras --subir
+python -m hdb campos
+python -m hdb corpus
+python -m hdb topicos --topicos 6 --versao t3
+python -m hdb relatorio
 python -m hdb status
 ```
 
 - `buscar`: grava acervo, páginas (pendentes) e ocorrências. Se a coleta cair, repetir o comando
   continua de onde parou.
 - `capturar`: opções `--quem` (padrão: usuário do sistema), `--bib`, `--termo`, `--max-paginas`
-  (padrão 50), `--aleatorio`, `--modo terminal|janela`, `--workers` (OCR em paralelo, padrão 4),
-  `--guardar-imagens DIR`. Páginas com erro voltam à fila até 3 tentativas. Com Ctrl+C, as páginas
+  (padrão 50), `--aleatorio`, `--equilibrar` (uma página de cada ano por rodada), `--modo terminal|janela`,
+  `--workers` (OCR em paralelo, padrão 4), `--guardar-imagens DIR`, `--sem-segmentar`. Por padrão, a captura
+  também separa os anúncios e grava as palavras do OCR no banco (tabela `paginas_palavras`); `--sem-segmentar`
+  desliga a separação. Páginas com erro voltam à fila até 3 tentativas. Com Ctrl+C, as páginas
   reservadas e não concluídas voltam para a fila. Imagens que sobraram em `data/tmp/` de uma
   execução interrompida são lidas antes de capturar páginas novas.
 - `importar`: carrega os CSVs de `data/ocorrencias/` e faz o OCR das imagens já baixadas em
@@ -106,7 +115,12 @@ python -m hdb status
   foram recuperadas (estavam em erro), com a confiança média antes e depois. Texto com menos de
   200 caracteres não é gravado. Uma página em erro vira `ok`; uma já `ok` só ganha a leitura nova.
   As imagens não são apagadas nem movidas.
-- `anuncios`: separa em colunas e anúncios as páginas já lidas (veja a seção abaixo).
+- `anuncios`: separa em colunas e anúncios as páginas já lidas (veja a seção abaixo). Pula as páginas que
+  já têm anúncios nessa versão; `--refazer` reprocessa todas.
+- `palavras --subir`: envia ao banco o cache de palavras do OCR que está em `data/ocr_palavras/`, sem OCR novo.
+- `campos`: classifica os anúncios (tipo, sexo, idade...) e extrai os campos (versão `c4`).
+- `corpus`: escolhe os anúncios de pessoas escravizadas e grava o texto padronizado (versão `corp2`).
+- `topicos`: modelagem de tópicos (LDA) sobre o corpus; `--topicos`, `--versao` e `--semente` escolhem o modelo.
 - `status`: páginas por status, por acervo e por termo, últimos erros e páginas por CAPTCHA.
 
 Modos de OCR (`config.OCR_MODO`):

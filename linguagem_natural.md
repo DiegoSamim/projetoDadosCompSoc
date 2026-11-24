@@ -12,7 +12,7 @@ Este documento explica, em passos simples, **como o computador vai "ler" os anú
 | Parte | O que faz | Como | Situação |
 |---|---|---|---|
 | **Regras** | Separa os anúncios e tira deles tipo, sexo, idade, nação, nome, recompensa | Listas de palavras e padrões ("de 14 a 16 annos", "de nação Benguella") | **Pronta** (`hdb anuncios`, `hdb campos`) |
-| **Tópicos** | Acha **sozinha** os temas que se repetem nos anúncios, por período legal | Estatística sobre as palavras (LDA) ou um modelo de linguagem (BERTopic) | **A fazer** (este documento) |
+| **Tópicos** | Acha **sozinha** os temas que se repetem nos anúncios, por período legal | Estatística sobre as palavras (LDA) ou um modelo de linguagem (BERTopic) | **Pronta** (`hdb corpus`, `hdb topicos`; LDA) |
 
 A diferença: nas **regras**, nós dizemos ao computador o que procurar. Nos **tópicos**, o computador nos mostra padrões que talvez não esperássemos. Por exemplo, que anúncios de aluguel depois de 1850 falam muito de "cozinhar, lavar e engommar".
 
@@ -43,7 +43,7 @@ As etapas 1 a 4 são feitas pelo computador. As etapas 5 e 6 são trabalho de pe
 - confiança do OCR acima de um mínimo (por exemplo 50);
 - pelo menos umas 8 palavras (anúncios mais curtos são pedaços).
 
-**Retorno:** uma tabela com um anúncio por linha: texto, ano, período legal, tipo, sexo. Hoje seriam 347 anúncios. Com a amostra do grupo capturada, a estimativa é de algumas centenas a mais.
+**Retorno:** uma tabela com um anúncio por linha: texto, ano, período legal, tipo, sexo. Hoje são 655 anúncios no corpus (campos `c4`, corpus `corp2`). Com a amostra do grupo capturada, a estimativa é de algumas centenas a mais.
 
 ### 2. Padronizar o texto
 
@@ -131,21 +131,26 @@ Com os tópicos nomeados, medimos quanto cada um pesa em cada período. A tabela
 
 Os campos já extraídos (sexo, idade) permitem fazer o mesmo **por gênero e idade**, por exemplo os tópicos dos anúncios de mulheres comparados com os de homens. Era um dos pedidos da reunião.
 
-## Como isso vai ficar na ferramenta
+## Como está na ferramenta
 
-A proposta segue o padrão dos outros comandos: tudo lido e gravado no banco, sem exportar arquivos.
+Segue o padrão dos outros comandos: tudo lido e gravado no banco, sem exportar arquivos.
 
-| Comando (a fazer) | Entra | Sai |
+| Comando | Entra | Sai |
 |---|---|---|
-| `hdb corpus` | anúncios com campos (`anuncios_completos`) | texto padronizado de cada anúncio, gravado ao lado do original |
-| `hdb topicos --tecnica lda --topicos 8` | o corpus | tópicos (palavras e pesos) e a mistura de tópicos de cada anúncio, gravados com o nome da versão |
+| `hdb corpus` (versão `corp2`) | anúncios com campos (versão `c4`) | texto padronizado de cada anúncio, gravado ao lado do original |
+| `hdb topicos --topicos 6 --versao t3` | o corpus | tópicos (palavras e pesos) e a mistura de tópicos de cada anúncio, gravados com o nome da versão |
 
-Depois, a análise (passos 5 e 6) é feita em um notebook, lendo o banco.
+- **Saída do `hdb corpus`:** quantos anúncios entraram no corpus e quantos foram descartados, com o motivo (tipo, aluguel sem marca de escravizado, OCR com confiança baixa, poucas palavras), e a contagem por período legal.
+- **Saída do `hdb topicos`:** uma linha com o número de anúncios e a perplexidade. Depois, para cada tópico, quantos anúncios o têm como dominante, as palavras mais fortes e a divisão por período legal e por tipo.
+- **Versões usadas:** `t3` (6 tópicos) é a principal; `t2` (8 tópicos) serve de comparação.
+
+Depois, a análise (passos 5 e 6) é feita em um notebook, lendo o banco ([notebooks/topicos_por_periodo.ipynb](notebooks/topicos_por_periodo.ipynb)).
 
 ## Cuidados
 
 - **Tópico não é fato histórico.** É um padrão de palavras. Quem dá sentido é a leitura do grupo, com a contextualização.
 - **Poucos anúncios dão tópicos instáveis.** Com algumas centenas de anúncios, rode mais de uma vez e veja se os tópicos se repetem.
+- **Estabilidade medida:** k=6 repete ~52% dos tópicos com similaridade ≥0,8; k=12, 21%. Por isso o k=6 é o principal, e o k=8 entra como comparação. Rode `scripts/estabilidade_topicos.py` a cada mudança no corpus.
 - **O OCR deixa ruído.** Palavras erradas podem formar um "tópico de lixo". A padronização e o corte de confiança reduzem isso.
 - **Anúncios grudados misturam temas.** Às vezes dois ou três anúncios vizinhos saem como um só. O jornal os separa com um travessão ("—"), e usar isso na separação é uma melhoria planejada.
 - **A amostra não é sorteada do jornal inteiro.** Ela vem de frases de busca, então mostra os anúncios **que essas frases acham**. Vale dizer isso na apresentação; o relatório metodológico (`hdb relatorio`) registra o caminho.

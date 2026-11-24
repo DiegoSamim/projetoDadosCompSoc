@@ -16,11 +16,12 @@ A ferramenta descobre quais jornais existem, busca páginas de jornais do sécul
   Banco: páginas "pendentes"
       │
       │ 2. capturar ─ abre cada página num navegador; uma pessoa digita o CAPTCHA;
-      │               baixa a imagem e lê o texto com OCR
+      │               baixa a imagem, lê o texto com OCR e separa os anúncios
       ▼
-  Banco: texto de cada página ("ok")
+  Banco: texto de cada página ("ok") e palavras do OCR
       │
       │ 3. anuncios ─ descobre as colunas da página e separa os anúncios
+      │               (a captura já faz isso; o comando refaz o que faltar)
       ▼
   Banco: anúncios (com título, palavra de abertura e texto limpo)
       │
@@ -28,9 +29,13 @@ A ferramenta descobre quais jornais existem, busca páginas de jornais do sécul
       ▼
   Banco: anúncios com campos e período legal (view anuncios_completos)
       │
-      │ 5. (a construir) corpus padronizado e tópicos ─ ver linguagem_natural.md
+      │ 5. corpus   ─ escolhe os anúncios de pessoas escravizadas e padroniza o texto
       ▼
-  Banco: tópicos de cada anúncio → comparação entre os períodos legais
+  Banco: corpus (texto padronizado, ao lado do original)
+      │
+      │ 6. topicos  ─ modelagem de tópicos (LDA); ver linguagem_natural.md
+      ▼
+  Banco: tópicos e a mistura de tópicos de cada anúncio → comparação entre os períodos legais
 ```
 
 ### As peças, uma a uma
@@ -102,8 +107,8 @@ Se você só quer ajudar a coletar, este é o caminho. O plano (quais termos, qu
 ```bash
 PYTHONPATH=src .venv/bin/python scripts/amostra.py situacao --pessoa N                 # 0. ver o que falta
 PYTHONPATH=src .venv/bin/python scripts/amostra.py listar --pessoa N                   # 1. listar (sem CAPTCHA, sozinho)
-PYTHONPATH=src .venv/bin/python scripts/amostra.py capturar --pessoa N --quem SeuNome  # 2. capturar (você digita o CAPTCHA)
-$PY -m hdb anuncios                                                         # 3. separar os anúncios
+PYTHONPATH=src .venv/bin/python scripts/amostra.py capturar --pessoa N --quem SeuNome  # 2. capturar (você digita o CAPTCHA; já separa os anúncios)
+$PY -m hdb anuncios                                                         # 3. separar o que faltar (pula o que já está pronto)
 $PY -m hdb campos                                                           # 4. extrair os campos
 $PY -m hdb relatorio                                                        # 5. registrar o método
 ```
@@ -112,7 +117,8 @@ $PY -m hdb relatorio                                                        # 5.
 - **`situacao`** mostra, para cada célula (tipo × período), quantas páginas foram listadas e quantas capturadas. Sem `--pessoa`, mostra a amostra inteira.
 - **`listar`** e **`capturar`** são retomáveis. Se parar, rode de novo e o script continua de onde estava, sem repetir nenhuma página.
 - **Várias pessoas** podem rodar o `capturar` ao mesmo tempo. O banco nunca entrega a mesma página a duas.
-- **Imagens:** o `capturar` do script guarda as imagens em `data/amostra/` (uns 6 MB por página), porque o `anuncios` ainda precisa delas.
+- **Listas extras:** `--complemento` e `--cobertura` sorteiam de modo equilibrado por ano (uma página de cada ano por rodada). `--cobertura` usa as páginas dos anos pouco cobertos, como 1886 a 1888.
+- **Imagens:** o `capturar` do script guarda as imagens em `data/amostra/` (uns 6 MB por página). Com elas, o `reprocessar` pode refazer o OCR; a separação em anúncios já não depende delas.
 - Os passos abaixo explicam cada comando por dentro, para quem quiser ir além da amostra.
 
 ## Passo a passo
@@ -147,7 +153,7 @@ $PY -m hdb buscar --bib 364568_04 --termo '"escrav* fugid*"' --limite 100
 - **Resultado:** `100 de 671 ocorrências de '"escrav* fugid*"' no banco.`
 - Se cair no meio, rode o mesmo comando de novo: ele continua de onde parou.
 
-### 3. Capturar e ler: `capturar`
+### 3. Capturar, ler e separar: `capturar`
 
 ```bash
 $PY -m hdb capturar --bib 364568_04 --termo '"escrav* fugid*"' --aleatorio --max-paginas 30 --quem ana --guardar-imagens data/amostra
@@ -159,7 +165,9 @@ $PY -m hdb capturar --bib 364568_04 --termo '"escrav* fugid*"' --aleatorio --max
 | `--aleatorio` | sorteia as páginas; sem ela, segue a ordem do jornal |
 | `--max-paginas` | quantas páginas nesta execução (padrão 50) |
 | `--quem` | seu nome, para o banco saber quem capturou (padrão: usuário do computador) |
-| `--guardar-imagens DIR` | guarda uma cópia de cada imagem (~3,5 MB por página); **hoje é necessário para separar os anúncios depois** |
+| `--guardar-imagens DIR` | guarda uma cópia de cada imagem (~3,5 MB por página). Não é mais preciso para separar os anúncios (isso sai do OCR, no banco); serve para guardar a imagem, por exemplo para `reprocessar` |
+| `--equilibrar` | sorteia uma página de cada ano por rodada, para os anos ficarem uniformes (o complemento também sai assim) |
+| `--sem-segmentar` | não separa os anúncios na hora; depois rode `anuncios` |
 | `--modo janela` | mostra o navegador; o CAPTCHA é digitado na própria janela |
 | `--workers` | quantas leituras de OCR ao mesmo tempo (padrão 4; mais que isso pode faltar memória) |
 
@@ -185,8 +193,11 @@ Cada página leva em média uns 40 segundos, quase tudo de OCR. Páginas de jorn
 $PY -m hdb anuncios --pasta data/amostra --depurar data/depuracao/paginas
 ```
 
-- **Precisa das imagens em disco** (as que foram capturadas com `--guardar-imagens`). Isso vai mudar quando a separação for feita dentro da captura (atividade 3.1 do planejamento).
-- Na primeira vez, refaz o OCR para obter a posição das palavras e guarda em `data/ocr_palavras/`. Nas seguintes, usa essa cópia e leva segundos.
+- **A captura já separa os anúncios** e grava as palavras do OCR no banco (tabela `paginas_palavras`, uns 50 KB por página). Este comando serve para o que ficou de fora: **pula as páginas que já têm anúncios nessa versão**. Com `--refazer`, reprocessa todas.
+- Com `capturar --sem-segmentar`, a captura não separa; rode este comando depois.
+- Página sem imagem, mas com palavras no banco, é separada a partir do banco.
+- Se a página não tem palavras no banco, precisa da imagem em disco. Na primeira vez, refaz o OCR para obter a posição das palavras e guarda em `data/ocr_palavras/`. Nas seguintes, usa essa cópia e leva segundos.
+- Quem já tem `data/ocr_palavras/` no computador pode mandar essas palavras ao banco, sem OCR novo: `$PY -m hdb palavras --subir` (opcional `--pasta`). Depois, rode `anuncios` e `campos`.
 - **Resultado por página:** `364568_03 p.44: 4 colunas, 622 segmentos, 66 anúncios, 24 com abertura, 14 com título`.
 - `--depurar DIR` cria uma imagem por página com as colunas (linhas vermelhas) e cada anúncio num retângulo numerado. É a melhor forma de conferir se a separação funcionou.
 - `--versao` (padrão `v2`) dá nome à versão da regra. Rodar de novo a mesma versão substitui os anúncios dela; uma versão nova convive com as antigas, o que permite comparar.
@@ -227,14 +238,14 @@ $PY -m hdb panorama --local RJ --periodo "1850 - 1859" --termo '"escrav* fugid*"
 ### 8. Extrair os campos dos anúncios: `campos`
 
 ```bash
-$PY -m hdb campos --versao-anuncios v2 --versao c2
+$PY -m hdb campos --versao-anuncios v2 --versao c4
 ```
 
 - Lê os anúncios já separados (versão `v2`) e, para cada um, grava na tabela `anuncio_campos`:
-  - o **tipo**: `fuga`, `venda`, `compra`, `aluguel`, `ama_de_leite` ou `outro`; e `procura`, que é verdadeiro quando quem anuncia quer obter alguém (COMPRA-SE, PRECISA-SE);
-  - **sexo**, **idade** (mínima e máxima), **nações**, **cores**, **condição** (escravizado, forro, livre), **nomes**, **ofícios**, **recompensa**, **valor** e **endereço**;
+  - o **tipo**: `fuga`, `venda`, `compra`, `aluguel`, `ama_de_leite` ou `outro` (e `aluguel_incerto`, aluguel sem marca de escravizado, como "criada" ou "rapariga", que fica fora do corpus); e `procura`, que é verdadeiro quando quem anuncia quer obter alguém (COMPRA-SE, PRECISA-SE);
+  - **sexo**, **idade** (mínima e máxima), **nações**, **cores**, **condição** (escravizado, forro, livre ou desconhecida), **nomes**, **ofícios**, **recompensa**, **valor** e **endereço**;
   - as **evidências**: o trecho do texto que justificou cada campo, para você conferir.
-- `--versao` (padrão `c2`, a atual) dá nome à versão da extração. Rodar de novo a mesma versão substitui; uma versão nova convive com as antigas. `--limite 100` processa só 100 anúncios, para testar.
+- `--versao` (padrão `c4`, a atual) dá nome à versão da extração. Rodar de novo a mesma versão substitui; uma versão nova convive com as antigas. `--limite 100` processa só 100 anúncios, para testar.
 - Não usa internet nem CAPTCHA, só o banco. No fim imprime um resumo: anúncios por tipo e por sexo, quantos têm idade, as nações mais comuns, quantos têm nome e recompensa.
 
 **Limites da extração de campos:**
@@ -246,7 +257,29 @@ $PY -m hdb campos --versao-anuncios v2 --versao c2
 - Anúncios de várias pessoas podem receber o sexo `ambos`, ou nomes e idades misturados.
 - Nenhum campo foi conferido por pessoas; não há taxa de acerto medida.
 
-### 9. Gerar o relatório: `relatorio`
+### 9. Padronizar o texto: `corpus`
+
+```bash
+$PY -m hdb corpus
+```
+
+- Escolhe, entre os anúncios com campos (versão `c4`), os de pessoas escravizadas com texto legível, e grava o texto padronizado (sem acento, grafia atual, sem palavras vazias) ao lado do original, em `anuncio_corpus`.
+- `--versao` (padrão `corp2`) dá nome à versão; regravar a mesma substitui. `--versao-campos` escolhe a versão dos campos usada na seleção.
+- A saída diz quantos anúncios entraram no corpus e quantos foram descartados, com o motivo: tipo `outro`, aluguel sem marca de escravizado, OCR com confiança baixa ou ausente, e poucas palavras. Depois, a contagem por período legal.
+
+### 10. Modelar os tópicos: `topicos`
+
+```bash
+$PY -m hdb topicos --topicos 6 --versao t3
+$PY -m hdb topicos --topicos 8 --versao t2
+```
+
+- Roda o LDA sobre o corpus e grava as palavras de cada tópico (`topico_palavras`), a mistura de tópicos de cada anúncio (`anuncio_topicos`) e o registro do modelo (`topico_modelos`), com o nome da versão.
+- `--topicos` (padrão 8), `--versao` (padrão `t2`) e `--semente` (padrão 0, para o resultado se repetir). O principal é `t3`, com 6 tópicos; `t2`, com 8, serve de comparação.
+- A saída tem uma linha com o número de anúncios e a perplexidade. Depois, para cada tópico: quantos anúncios o têm como dominante, as palavras mais fortes e a divisão por período legal e por tipo.
+- O número de tópicos muda os temas: veja os Cuidados em [linguagem_natural.md](linguagem_natural.md). A estabilidade é medida com `scripts/estabilidade_topicos.py`. A comparação dos períodos está nos notebooks [topicos_por_periodo.ipynb](notebooks/topicos_por_periodo.ipynb) e [analise_descritiva.ipynb](notebooks/analise_descritiva.ipynb).
+
+### 11. Gerar o relatório: `relatorio`
 
 ```bash
 $PY -m hdb relatorio
@@ -257,7 +290,7 @@ $PY -m hdb relatorio --saida relatorios/minha_versao.md
 - Sem `--saida`, o arquivo vai para `relatorios/relatorio_<data>.md`. O comando imprime o caminho.
 - Tudo vem do banco: rode depois de capturar ou extrair para o relatório sair atualizado. Serve de base para a seção de método do trabalho.
 
-### 10. Consultar os dados no banco
+### 12. Consultar os dados no banco
 
 Os dados ficam no Supabase. No painel do projeto, abra o **SQL Editor** e rode consultas como estas. **Não há exportação em CSV ou JSON pela ferramenta: os dados ficam no banco** e se consultam por SQL.
 
@@ -298,7 +331,7 @@ Anúncios de fuga com recompensa, por período legal (a view `anuncios_completos
 ```sql
 select periodo_legal, count(*) as anuncios
 from anuncios_completos
-where versao = 'v2' and c_versao = 'c2' and c_tipo = 'fuga' and c_recompensa
+where versao = 'v2' and c_versao = 'c4' and c_tipo = 'fuga' and c_recompensa
 group by periodo_legal
 order by periodo_legal;
 ```
@@ -308,7 +341,7 @@ Anúncios de venda de mulheres, com idade e nação:
 ```sql
 select ano, acervo, c_idade_min, c_idade_max, c_nacoes, c_nomes, c_valor, texto
 from anuncios_completos
-where versao = 'v2' and c_versao = 'c2' and c_tipo = 'venda' and c_sexo = 'f'
+where versao = 'v2' and c_versao = 'c4' and c_tipo = 'venda' and c_sexo = 'f'
 order by ano;
 ```
 
@@ -317,7 +350,7 @@ Conferir uma amostra de 20 anúncios com o trecho que justificou cada campo:
 ```sql
 select id, c_tipo, c_sexo, c_nacoes, c_evidencias, texto
 from anuncios_completos
-where versao = 'v2' and c_versao = 'c2'
+where versao = 'v2' and c_versao = 'c4'
 order by random()
 limit 20;
 ```
@@ -328,6 +361,8 @@ limit 20;
 |---|---|
 | `reprocessar` | refaz o OCR de imagens guardadas em disco (sem internet nem CAPTCHA) e mostra o antes e depois de cada página. Útil para testar melhorias do OCR. |
 | `importar` | carrega no banco dados da primeira versão da ferramenta (arquivos CSV e imagens antigas). Só foi usado uma vez. |
+| `palavras --subir [--pasta data/ocr_palavras]` | envia ao banco o cache de palavras do OCR que está no disco (sem OCR novo). Serve para as páginas separadas antes da mudança. |
+| `scripts/estabilidade_topicos.py` | mede a estabilidade do LDA por número de tópicos (k) e semente. Use antes de escolher o k. |
 | `scripts/contar_termos.py` | conta em quantas páginas cada termo aparece em cada acervo. Para testar termos novos, acrescente-os à lista do arquivo e rode: ele conta só o que falta. |
 | `scripts/contar_paginas.py` | conta o total de páginas de cada acervo. |
 
@@ -348,8 +383,13 @@ Testes automáticos (não usam internet nem banco): `$PY -m pytest`.
 | `acervos_periodos` | a lista de periódicos de cada local e período (posição na lista, nome e código `bib`) |
 | `contagens` | em quantas páginas do acervo inteiro cada termo aparece |
 | `anuncio_campos` | tipo e campos extraídos de cada anúncio, por versão da extração, com as evidências |
+| `anuncio_corpus` | o texto padronizado de cada anúncio do corpus, ao lado do original |
+| `topico_modelos` | cada modelo de tópicos rodado, por versão |
+| `topico_palavras` | as palavras mais fortes de cada tópico, com o peso |
+| `anuncio_topicos` | a mistura de tópicos de cada anúncio |
+| `paginas_palavras` | a posição das palavras lidas pelo OCR, por página (uns 50 KB cada); permite separar anúncios sem a imagem |
 
-E duas "views" (consultas prontas, que se usam como tabelas): `panorama` (o ranking de acervos por termo) e `anuncios_completos` (anúncio, página, acervo, período legal e campos juntos).
+Quatro "views" (consultas prontas, que se usam como tabelas): `panorama` (o ranking de acervos por termo), `anuncios_completos` (anúncio, página, acervo, período legal e campos juntos), `textos_atuais` (o texto mais recente de cada página) e `topicos_por_periodo` (os tópicos por período legal).
 
 **No computador (pasta `data/`):**
 
@@ -378,14 +418,15 @@ E duas "views" (consultas prontas, que se usam como tabelas): `panorama` (o rank
 | A captura parou no meio | rode o mesmo comando: as páginas voltaram para a fila e as imagens que sobraram em `data/tmp/` são lidas primeiro |
 | Página com status `erro` de OCR | a imagem está em `data/falhas_ocr/`; teste com `reprocessar --pasta data/falhas_ocr` |
 | A captura está lenta | é o OCR; páginas densas levam mais de um minuto |
-| O `anuncios` não acha uma página | a imagem não foi guardada; capture com `--guardar-imagens` |
-| O computador ficou sem espaço | as imagens de `data/amostra/` ocupam ~3,5 MB cada. Só apague as que não for mais separar em anúncios: hoje o `anuncios` precisa da imagem para encontrar a página (isso muda com a atividade 3.1 do planejamento) |
+| O `anuncios` não acha imagem nem palavras de uma página | se houver `data/ocr_palavras/` na máquina, rode `palavras --subir`; senão, a imagem precisa estar em disco (`data/amostra/`) |
+| O computador ficou sem espaço | as imagens de `data/amostra/` ocupam ~3,5 MB cada. Podem ser apagadas as de páginas que já têm palavras no banco (`anuncios` e `campos` não dependem mais delas). Não apague as das páginas ainda sem separação (planejamento, A1) |
 
 ## Limites que convém conhecer
 
 - **O OCR erra letras**, principalmente nas páginas densas de 1850 a 1880, e às vezes pula uma linha encostada numa régua.
 - **A extração de campos também é heurística** (veja o passo 8): confira por amostra.
 - **A separação de anúncios é heurística:** pode juntar dois anúncios vizinhos ou partir um em dois. As imagens de depuração mostram onde.
+- **Os tópicos mudam com o número de tópicos e a semente.** Com poucos anúncios, o LDA é instável. Veja os Cuidados em [linguagem_natural.md](linguagem_natural.md).
 - **A busca da HDB conta páginas, não anúncios,** e só acha o que o OCR da própria BN leu certo.
 - **Uso responsável:** a ferramenta faz uma pausa fixa entre requisições, para não sobrecarregar a Biblioteca Nacional, e nunca contorna o CAPTCHA. Não reduza essas pausas.
 
@@ -402,4 +443,5 @@ E duas "views" (consultas prontas, que se usam como tabelas): `panorama` (o rank
 | **anúncio `largo`** | anúncio que provavelmente pega texto de mais de uma coluna |
 | **versão** (`v1`, `v2`) | qual regra de separação de anúncios gerou aquele resultado |
 | **corpus** | o conjunto final de anúncios que vai para a análise |
+| **palavras do OCR** | a posição de cada palavra lida numa página; fica no banco (`paginas_palavras`) para separar os anúncios sem a imagem |
 | **modelagem de tópicos** | técnica que agrupa textos por temas que se repetem |

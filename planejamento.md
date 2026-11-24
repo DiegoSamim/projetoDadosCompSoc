@@ -54,7 +54,7 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 
 Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúncios vêm do Diário do RJ (101 de 106 na rodada anterior).
 
-### A ferramenta (`hdb`, 325 testes)
+### A ferramenta (`hdb`, 341 testes)
 
 | Etapa | Comando | Situação |
 |---|---|---|
@@ -105,10 +105,10 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 
 | # | Tarefa | Quem | Tempo | Depende de | Pronto quando |
 |---|---|---|---|---|---|
-| A1 | **Separar as 49 páginas** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). `git pull`, depois `hdb anuncios` e `hdb campos`, **sem apagar `data/amostra/`** | quem capturou essas páginas | ~1 h | as imagens existirem na máquina dele | nenhuma página com texto sem anúncios |
-| A2 | **Cobrir 1886–1888**: listar mais páginas de `"escrav* fugid*"` no JC 1880s (hoje só há 1880, 1881 e 1885) e capturar uma amostra sorteada por ano | Diego (listar) e quem captura | listar ~1 h; capturar ~8 páginas, 2 CAPTCHAs | nada | existem anúncios dos anos 1886, 1887 e 1888 |
-| A3 | **Complemento** (91 páginas, `--complemento`): verificar quanto já foi capturado | quem capturou | — | — | `scripts/amostra.py situacao` mostra o andamento |
-| A4 | **Plano B, se as imagens da A1 sumiram:** a captura passa a guardar as palavras no banco (atividade 3.1). As 49 páginas precisariam ser recapturadas, com CAPTCHA | Claude implementa; grupo recaptura | meio dia + ~1 h | falha da A1 | `hdb anuncios` refaz a separação a partir do banco |
+| A1 | **Separar as 49 páginas** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). `git pull`, depois `hdb anuncios` e `hdb campos`, **sem apagar `data/amostra/`**. Alternativa, sem as imagens: `hdb palavras --subir` envia ao banco o cache de `data/ocr_palavras/` (sem OCR novo), e depois `hdb anuncios` e `hdb campos` | quem capturou essas páginas | ~1 h | as imagens ou o cache `data/ocr_palavras/` existirem na máquina dele | nenhuma página com texto sem anúncios |
+| A2 | **Cobrir 1886–1888**: listar mais páginas de `"escrav* fugid*"` no JC 1880s (hoje só há 1880, 1881 e 1885) e capturar uma amostra sorteada por ano. **Situação:** listagem de 1886–1888 em andamento; falta capturar com `--cobertura` | Diego (listar) e quem captura | listar ~1 h; capturar ~8 páginas, 2 CAPTCHAs | nada | existem anúncios dos anos 1886, 1887 e 1888 |
+| A3 | **Complemento** (91 páginas, `--complemento`): 5 de 91 capturadas; extras 47 de 47. Os acervos DRJ 1860–78 e Correio Mercantil voltaram a responder | quem capturou | — | — | `scripts/amostra.py situacao` mostra o andamento |
+| A4 | **FEITO: palavras do OCR no banco.** A captura já separa os anúncios e grava as palavras (tabela `paginas_palavras`). Se as imagens da A1 sumiram, `hdb palavras --subir` envia o cache que estiver em `data/ocr_palavras/`; sem esse cache, as páginas precisam ser recapturadas, com CAPTCHA | Claude implementa; grupo recaptura | — | — | `hdb anuncios` refaz a separação a partir do banco |
 
 ### B. Qualidade
 
@@ -134,8 +134,8 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 
 | # | Tarefa | Quem |
 |---|---|---|
-| D1 | Atualizar [guia_ferramenta.md](guia_ferramenta.md) e [linguagem_natural.md](linguagem_natural.md) com `corpus`, `topicos`, `c4`, `aluguel_incerto` e `--refazer` | Claude |
-| D2 | Atualizar a tabela de situação do [README](README.md) e de [projeto.md](projeto.md) | Claude |
+| D1 | **FEITO em 24/11.** Atualizar [guia_ferramenta.md](guia_ferramenta.md) e [linguagem_natural.md](linguagem_natural.md) com `corpus`, `topicos`, `c4`, `aluguel_incerto` e `--refazer` | Claude |
+| D2 | **FEITO em 24/11.** Atualizar a tabela de situação do [README](README.md) e de [projeto.md](projeto.md) | Claude |
 | D3 | Tutorial de captura: a edição local do Diego (sem o passo do `.env`) ainda não foi commitada | Diego decide |
 | D4 | Confirmar com o professor a data da apresentação | Diego |
 
@@ -163,7 +163,7 @@ Em ordem de retorno para o projeto. Nenhuma é obrigatória.
 | M1 | **Checagem de cobertura:** capturar ~10 páginas por período **sem termo de busca** e contar quantos anúncios de escravizados as frases perderam | é a melhor defesa contra a crítica "a amostra foi escolhida pelas frases"; exige um ajuste na captura | médio |
 | M2 | **Buscar vendas e compras de homens depois de 1850** com palavras soltas na mesma página (`vende escravo`), porque a frase "vende-se um preto" some | a amostra de venda hoje tem viés para mulheres | médio |
 | M3 | **Segundo jornal** (Correio Mercantil, Diário do RJ 1860–78) | mostra se o padrão é do jornal ou da época; a HDB tem falhado para esses acervos | depende do site |
-| M4 | **Mais anúncios por período**, sorteando por ano em vez de seguir a ordem da lista | a cobertura de anos fica uniforme | baixo |
+| M4 | **FEITO** (`--equilibrar`, `--cobertura`). **Mais anúncios por período**, sorteando por ano em vez de seguir a ordem da lista | a cobertura de anos fica uniforme | baixo |
 
 ### Para os tópicos ficarem mais limpos
 
@@ -179,7 +179,7 @@ Em ordem de retorno para o projeto. Nenhuma é obrigatória.
 
 | # | Melhoria | Por quê | Esforço |
 |---|---|---|---|
-| M10 | **Guardar as palavras do OCR no banco** (atividade 3.1) | ninguém depende de imagens de outra máquina; permite melhorar a separação depois | médio |
+| M10 | **FEITO** (A4). **Guardar as palavras do OCR no banco** (atividade 3.1) | ninguém depende de imagens de outra máquina; permite melhorar a separação depois | médio |
 | M11 | **Melhorar o OCR do JC 1860–1880** (pré-processamento da imagem; confiança média hoje em 63–67) | os anos 1870 têm "LUGA-SE", "cosinta", "engomms" | médio |
 | M12 | **Extrair idade e valor em mais anúncios** (hoje só 13% têm idade; 3 fugas têm valor de recompensa) | os recortes por idade têm n de 9 a 58 | médio |
 | M13 | **Regra de venda e compra com marca de escravizado**, como no aluguel (`c5`) | "VENDE-SE uma criada" ainda passa | baixo |
