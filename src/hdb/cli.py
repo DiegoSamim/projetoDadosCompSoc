@@ -53,7 +53,8 @@ def cmd_anuncios(args):
         anuncios_do_arquivo(args.palavras, args.imagem, args.depurar)
         return
     banco = None if args.sem_banco else _banco()
-    anuncios_das_paginas(banco, args.pasta, versao=args.versao, limite=args.limite, depurar=args.depurar)
+    anuncios_das_paginas(banco, args.pasta, versao=args.versao, limite=args.limite, depurar=args.depurar,
+                         refazer=args.refazer)
 
 
 def cmd_campos(args):
@@ -157,6 +158,8 @@ def criar_parser():
     p.add_argument("--versao", default=config.VERSAO_ANUNCIOS,
                    help=f"versão da segmentação; regravar a mesma substitui (padrão: {config.VERSAO_ANUNCIOS})")
     p.add_argument("--limite", type=int, help="máximo de imagens (padrão: todas)")
+    p.add_argument("--refazer", action="store_true",
+                   help="reprocessa também as páginas que já têm anúncios nessa versão (padrão: pula)")
     p.add_argument("--depurar", metavar="DIR", type=Path,
                    help="grava em DIR um PNG por página com as colunas e os anúncios, para revisão visual")
     p.add_argument("--sem-banco", action="store_true", help="não grava no banco (nem precisa de acesso a ele)")

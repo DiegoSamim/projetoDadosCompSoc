@@ -352,3 +352,55 @@ def test_anuncios_sem_banco_nao_consulta_nada(tmp_path, monkeypatch):
     pasta.mkdir(parents=True)
     (pasta / "b_00005.jpg").write_bytes(b"x")
     captura.anuncios_das_paginas(None, [tmp_path / "imgs"], limite=1)
+
+
+def _pasta_com_paginas(tmp_path, monkeypatch, numeros):
+    monkeypatch.setattr(config, "OCR_PALAVRAS_DIR", tmp_path / "cache")
+    chamadas = []
+    monkeypatch.setattr(captura.ocr, "ler_palavras", lambda caminho: chamadas.append(caminho) or _dados_de_palavras())
+    pasta = tmp_path / "imgs" / "b"
+    pasta.mkdir(parents=True)
+    for n in numeros:
+        (pasta / f"b_{n:05d}.jpg").write_bytes(b"x")
+    return chamadas
+
+
+def _banco_com_paginas(numeros):
+    from hdb.banco import BancoMemoria
+
+    banco = BancoMemoria()
+    return banco, [banco.garantir_pagina({"bib": "b", "pagina_fisica": str(n), "termo": "t", "ocorrencia": 1})
+                   for n in numeros]
+
+
+def test_anuncios_pula_paginas_que_ja_tem_anuncios(tmp_path, monkeypatch, capsys):
+    chamadas = _pasta_com_paginas(tmp_path, monkeypatch, [5, 6])
+    banco, (p5, p6) = _banco_com_paginas([5, 6])
+    banco.registrar_anuncios(p5["id"], "v1", [{"ordem": 1}])
+    captura.anuncios_das_paginas(banco, [tmp_path / "imgs"], versao="v1")
+    assert len(chamadas) == 1 and banco.anuncios(p6["id"], "v1")
+    assert "1 páginas segmentadas, 1 puladas (já tinham anúncios; use --refazer)." in capsys.readouterr().out
+
+
+def test_anuncios_pula_so_na_mesma_versao(tmp_path, monkeypatch):
+    chamadas = _pasta_com_paginas(tmp_path, monkeypatch, [5])
+    banco, (p5,) = _banco_com_paginas([5])
+    banco.registrar_anuncios(p5["id"], "v0", [{"ordem": 1}])
+    captura.anuncios_das_paginas(banco, [tmp_path / "imgs"], versao="v1")
+    assert len(chamadas) == 1
+
+
+def test_anuncios_refazer_nao_pula(tmp_path, monkeypatch, capsys):
+    chamadas = _pasta_com_paginas(tmp_path, monkeypatch, [5])
+    banco, (p5,) = _banco_com_paginas([5])
+    banco.registrar_anuncios(p5["id"], "v1", [{"ordem": 1}])
+    captura.anuncios_das_paginas(banco, [tmp_path / "imgs"], versao="v1", refazer=True)
+    assert len(chamadas) == 1 and "puladas" not in capsys.readouterr().out
+
+
+def test_anuncios_limite_conta_so_as_segmentadas(tmp_path, monkeypatch):
+    chamadas = _pasta_com_paginas(tmp_path, monkeypatch, [5, 6, 7])
+    banco, (p5, p6, p7) = _banco_com_paginas([5, 6, 7])
+    banco.registrar_anuncios(p5["id"], "v1", [{"ordem": 1}])
+    captura.anuncios_das_paginas(banco, [tmp_path / "imgs"], versao="v1", limite=1)
+    assert len(chamadas) == 1 and banco.anuncios(p6["id"], "v1") and not banco.anuncios(p7["id"], "v1")

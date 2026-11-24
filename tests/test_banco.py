@@ -246,6 +246,45 @@ def test_anuncios_para_campos_lista_so_a_versao_com_id(banco):
     assert banco.anuncios_para_campos("v9") == []
 
 
+def test_paginas_com_anuncios_so_da_versao(banco):
+    banco.registrar_anuncios(1, "v1", [anuncio(1), anuncio(2)])
+    banco.registrar_anuncios(2, "v2", [anuncio(1)])
+    banco.registrar_anuncios(3, "v1", [])  # sem anúncios não conta
+    assert banco.paginas_com_anuncios("v1") == {1}
+    assert banco.paginas_com_anuncios("v2") == {2} and banco.paginas_com_anuncios("v9") == set()
+
+
+def test_supabase_paginas_com_anuncios_pagina_e_deduplica(monkeypatch):
+    linhas = [{"id": i, "pagina_id": i // 3} for i in range(2500)]
+
+    class Consulta:
+        def __init__(self):
+            self.chamadas = []
+
+        def select(self, *_):
+            return self
+
+        def eq(self, *_):
+            return self
+
+        def order(self, *_):
+            return self
+
+        def range(self, a, b):
+            self.chamadas.append((a, b))
+            self.lote = linhas[a:b + 1]
+            return self
+
+        def execute(self):
+            return type("R", (), {"data": self.lote})()
+
+    consulta = Consulta()
+    banco = modulo_banco.BancoSupabase.__new__(modulo_banco.BancoSupabase)
+    banco.cliente = type("C", (), {"table": lambda self, nome: consulta})()
+    assert banco.paginas_com_anuncios("v1") == {i // 3 for i in range(2500)}
+    assert len(consulta.chamadas) == 3
+
+
 def test_registrar_campos_faz_upsert_e_versoes_coexistem(banco):
     assert banco.registrar_campos("c1", [{"anuncio_id": 1, "tipo": "venda"}, {"anuncio_id": 2, "tipo": "fuga"}]) == 2
     banco.registrar_campos("c1", [{"anuncio_id": 1, "tipo": "outro"}])

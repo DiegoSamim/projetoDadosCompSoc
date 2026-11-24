@@ -566,9 +566,12 @@ def anuncios_do_arquivo(palavras, imagem, depurar=None):
     return r
 
 
-def anuncios_das_paginas(banco, pastas, versao=config.VERSAO_ANUNCIOS, limite=None, depurar=None):
-    """Para cada imagem de `pastas`: palavras (com cache), layout, anúncios; grava no banco se `banco` não é None."""
-    total = 0
+def anuncios_das_paginas(banco, pastas, versao=config.VERSAO_ANUNCIOS, limite=None, depurar=None,
+                         refazer=False):
+    """Para cada imagem de `pastas`: palavras (com cache), layout, anúncios; grava no banco se `banco` não é None.
+    Pula as páginas que já têm anúncios nessa versão, salvo `refazer`; `limite` conta só as segmentadas."""
+    total = puladas = 0
+    prontas = banco.paginas_com_anuncios(versao) if banco and not refazer else set()
     for (bib, pagfis), caminho in _imagens_das_pastas(pastas):
         if limite is not None and total >= limite:
             break
@@ -576,6 +579,9 @@ def anuncios_das_paginas(banco, pastas, versao=config.VERSAO_ANUNCIOS, limite=No
         pagina = banco.pagina(bib, pagfis) if banco else None
         if banco and pagina is None:
             print(f"{nome}: página desconhecida no banco; ignorada")
+            continue
+        if pagina and pagina["id"] in prontas:
+            puladas += 1
             continue
         dados = palavras_da_imagem(caminho, bib, pagfis)
         r = segmentar_pagina(dados)
@@ -585,4 +591,5 @@ def anuncios_das_paginas(banco, pastas, versao=config.VERSAO_ANUNCIOS, limite=No
         if depurar:
             desenhar_depuracao(caminho, dados, r, Path(depurar) / f"{bib}_{int(pagfis):05d}.png")
         total += 1
-    print(f"\n{total} páginas segmentadas.")
+    pulo = f", {puladas} puladas (já tinham anúncios; use --refazer)" if puladas else ""
+    print(f"\n{total} páginas segmentadas{pulo}.")

@@ -140,6 +140,11 @@ class BancoSupabase:
             consulta = consulta.eq("versao", versao)
         return consulta.order("versao").order("ordem").execute().data
 
+    def paginas_com_anuncios(self, versao):
+        """O conjunto de `pagina_id` que já têm anúncios gravados nessa versão."""
+        linhas = _todas(self.cliente.table("anuncios").select("id,pagina_id").eq("versao", versao).order("id"))
+        return {l["pagina_id"] for l in linhas}
+
     def anuncios_para_campos(self, versao_anuncios):
         """Todos os anúncios da versão como [{id, titulo, abertura, texto}], por id."""
         return _todas(self.cliente.table("anuncios").select("id,titulo,abertura,texto")
@@ -315,6 +320,9 @@ class BancoMemoria:
     def anuncios(self, pagina_id, versao=None):
         return [dict(a) for (id_, v), lista in sorted(self.lista_anuncios.items())
                 if id_ == pagina_id and versao in (None, v) for a in sorted(lista, key=lambda a: a["ordem"])]
+
+    def paginas_com_anuncios(self, versao):
+        return {id_ for (id_, v), lista in self.lista_anuncios.items() if v == versao and lista}
 
     def anuncios_para_campos(self, versao_anuncios):
         achados = [a for (_, v), lista in self.lista_anuncios.items() if v == versao_anuncios for a in lista]
