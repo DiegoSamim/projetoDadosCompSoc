@@ -69,6 +69,12 @@ def cmd_corpus(args):
     print(formatar_resumo(processar(_banco(), args.versao_campos, args.versao)))
 
 
+def cmd_topicos(args):
+    from hdb.topicos import formatar_resumo, processar
+
+    print(formatar_resumo(processar(_banco(), args.versao_corpus, args.topicos, args.semente, args.versao)))
+
+
 def cmd_acervos(args):
     from hdb.acervos import descobrir_acervos
 
@@ -190,6 +196,18 @@ def criar_parser():
     p.add_argument("--versao", default=config.VERSAO_CORPUS,
                    help=f"versão do corpus; regravar a mesma substitui (padrão: {config.VERSAO_CORPUS})")
     p.set_defaults(func=cmd_corpus)
+
+    p = sub.add_parser("topicos", help="modelagem de tópicos (LDA) sobre o corpus padronizado; grava palavras e "
+                                       "misturas por anúncio")
+    p.add_argument("--versao-corpus", default=config.VERSAO_CORPUS,
+                   help=f"versão do corpus a modelar (padrão: {config.VERSAO_CORPUS})")
+    p.add_argument("--topicos", type=int, default=config.N_TOPICOS,
+                   help=f"número de tópicos (padrão: {config.N_TOPICOS})")
+    p.add_argument("--semente", type=int, default=config.SEMENTE_TOPICOS,
+                   help=f"semente do LDA (padrão: {config.SEMENTE_TOPICOS})")
+    p.add_argument("--versao", default=config.VERSAO_TOPICOS,
+                   help=f"versão do modelo; regravar a mesma substitui (padrão: {config.VERSAO_TOPICOS})")
+    p.set_defaults(func=cmd_topicos)
 
     p = sub.add_parser("acervos", help="descobre os periódicos de um estado e década na HDB e grava o código (bib) "
                                        "de cada um")

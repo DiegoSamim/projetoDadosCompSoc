@@ -91,6 +91,13 @@ VERSAO_CORPUS = "corp1"  # versão do texto padronizado (hdb.corpus); muda quand
 LOTE_CORPUS = 500  # linhas do corpus gravadas por chamada ao banco
 CORPUS_CONFIANCA_MIN = 50  # confiança mínima do OCR para o anúncio entrar no corpus
 CORPUS_PALAVRAS_MIN = 8  # anúncios com menos palavras são pedaços, não anúncios inteiros
+VERSAO_TOPICOS = "t1"  # versão do modelo de tópicos (hdb.topicos); regravar a mesma substitui
+N_TOPICOS = 8  # número de tópicos do LDA
+SEMENTE_TOPICOS = 0  # semente do LDA (resultado reproduzível)
+TOPICOS_MIN_DF = 3  # palavra tem de aparecer em pelo menos tantos anúncios
+TOPICOS_MAX_DF = 0.5  # ... e em no máximo esta fração deles
+TOPICOS_PALAVRAS = 12  # palavras mostradas e gravadas por tópico
+TOPICOS_TIPICOS = 5  # anúncios típicos por tópico
 VERSAO_ANUNCIOS = "v2"  # versão da segmentação em anúncios; muda quando as heurísticas mudam
 DEPURACAO_LARGURA = 900  # px de largura dos PNGs de depuração
 

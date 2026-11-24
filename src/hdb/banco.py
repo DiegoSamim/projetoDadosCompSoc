@@ -174,6 +174,26 @@ class BancoSupabase:
         """Grava (upsert por anúncio e versão) as linhas [{anuncio_id, texto_padrao, n_palavras}]. Devolve quantas."""
         return self._rpc("registrar_corpus", p_versao=versao, p_linhas=linhas)
 
+    def anuncios_do_corpus(self, versao_corpus):
+        """Anúncios do corpus como [{id, texto_padrao, periodo_legal, c_tipo, c_sexo, c_idade_min, ano}], por id."""
+        corpus = _todas(self.cliente.table("anuncio_corpus").select("anuncio_id,texto_padrao")
+                        .eq("versao", versao_corpus).order("anuncio_id"))
+        colunas = "id,periodo_legal,c_tipo,c_sexo,c_idade_min,ano,c_criado_em"
+        por_id = {}
+        for i in range(0, len(corpus), 100):
+            ids = [c["anuncio_id"] for c in corpus[i:i + 100]]
+            for l in _todas(self.cliente.table("anuncios_completos").select(colunas).in_("id", ids).order("id")):
+                antigo = por_id.get(l["id"])  # várias versões de campos: fica a mais recente
+                if antigo is None or (l.get("c_criado_em") or "") > (antigo.get("c_criado_em") or ""):
+                    por_id[l["id"]] = l
+        return [{"id": c["anuncio_id"], "texto_padrao": c["texto_padrao"],
+                 **{k: por_id.get(c["anuncio_id"], {}).get(k)
+                    for k in ("periodo_legal", "c_tipo", "c_sexo", "c_idade_min", "ano")}} for c in corpus]
+
+    def registrar_topicos(self, modelo, palavras, misturas):
+        """Grava o modelo, as palavras por tópico e as misturas por anúncio; regravar a versão substitui tudo."""
+        return self._rpc("registrar_topicos", p_modelo=modelo, p_palavras=palavras, p_misturas=misturas)
+
     def registrar_erro(self, pagina_id, quem, etapa, erro, segundos, captchas):
         self._rpc("registrar_erro", p_pagina_id=pagina_id, p_quem=quem, p_etapa=etapa,
                   p_erro=erro, p_segundos=segundos, p_captchas=captchas)
@@ -244,6 +264,9 @@ class BancoMemoria:
         self.lista_anuncios = {}  # (pagina_id, versao) -> lista de dicts
         self.campos = {}  # (anuncio_id, versao) -> dict
         self.corpus = {}  # (anuncio_id, versao) -> dict
+        self.topico_modelos = {}  # versao -> dict
+        self.topico_palavras = {}  # (versao, topico, palavra) -> peso
+        self.anuncio_topicos = {}  # (anuncio_id, versao, topico) -> proporcao
         self.proximo_anuncio = 1
         self.dados_acervos = {}  # bib -> {ano_inicio, ano_fim, total_paginas}
         self.periodos = {}  # (local, periodo, posicao) -> {nome_lista, bib, erro}
@@ -369,6 +392,33 @@ class BancoMemoria:
         for l in linhas:
             self.corpus[(l["anuncio_id"], versao)] = {**l, "versao": versao, "criado_em": self.agora()}
         return len(linhas)
+
+    def anuncios_do_corpus(self, versao_corpus):
+        ids = {a["id"]: self.paginas.get(pid, {}).get("ano") for (pid, _), lista in self.lista_anuncios.items() for a in lista}
+        saida = []
+        for (anuncio_id, v), c in sorted(self.corpus.items()):
+            if v != versao_corpus:
+                continue
+            campos = [x for (i, _), x in sorted(self.campos.items()) if i == anuncio_id]
+            campo = campos[-1] if campos else {}
+            ano = ids.get(anuncio_id)
+            saida.append({"id": anuncio_id, "texto_padrao": c.get("texto_padrao"), "periodo_legal": periodo_legal_do_ano(ano),
+                          "c_tipo": campo.get("tipo"), "c_sexo": campo.get("sexo"),
+                          "c_idade_min": campo.get("idade_min"), "ano": ano})
+        return saida
+
+    def registrar_topicos(self, modelo, palavras, misturas):
+        versao = modelo["versao"]
+        self.topico_modelos.pop(versao, None)
+        for d in (self.topico_palavras, self.anuncio_topicos):
+            for k in [k for k in d if k[0 if d is self.topico_palavras else 1] == versao]:
+                del d[k]
+        self.topico_modelos[versao] = {**modelo, "criado_em": self.agora()}
+        for p in palavras:
+            self.topico_palavras[(versao, p["topico"], p["palavra"])] = p["peso"]
+        for m in misturas:
+            self.anuncio_topicos[(m["anuncio_id"], versao, m["topico"])] = m["proporcao"]
+        return len(misturas)
 
     def registrar_erro(self, pagina_id, quem, etapa, erro, segundos, captchas):
         p = self.paginas[pagina_id]

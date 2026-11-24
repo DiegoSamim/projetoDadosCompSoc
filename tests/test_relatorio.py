@@ -36,6 +36,16 @@ def test_montar_tem_todas_as_secoes_e_numeros_formatados():
     assert "pyHDB" in texto and "luizhenriquesoares" in texto
 
 
+def test_limites_conhecidos_trazem_as_ressalvas_da_amostra():
+    texto = relatorio.montar(DADOS)
+    secao = texto.split("## 7. Limites conhecidos", 1)[1].split("## 8.", 1)[0]
+    assert "não é aleatória" in secao and "vende-se uma preta" in secao
+    assert "ordem de data" in secao and "1880–1889 há 1880, 1881 e 1885" in secao
+    assert "Diário do Rio de Janeiro (1821)" in secao and "Diário Fluminense" in secao
+    assert "criada" in secao and "`desconhecida`" in secao
+    assert "LDA" in secao and "não fatos históricos" in secao
+
+
 def test_montar_com_secoes_vazias():
     texto = relatorio.montar({"gerado_em": None, "buscas": [], "capturas": [], "ocr": {}, "anuncios": [],
                               "campos": [], "panorama": {"periodos": [], "termos": []}})

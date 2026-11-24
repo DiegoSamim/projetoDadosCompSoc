@@ -694,3 +694,93 @@ revoke all on function public.registrar_corpus(text, jsonb) from public, anon, a
 
 grant select, insert, update, delete on table public.anuncio_corpus to service_role;
 grant execute on function public.registrar_corpus(text, jsonb) to service_role;
+
+
+-- ============================================================================================
+-- Modelagem de tópicos, LDA (hdb.topicos). Nome sugerido da migração: `topicos_lda`. Idempotente.
+-- ============================================================================================
+
+create table if not exists public.topico_modelos (
+    versao       text primary key,
+    versao_corpus text,
+    n_topicos    int,
+    semente      int,
+    n_docs       int,
+    n_vocab      int,
+    perplexidade double precision,
+    criado_em    timestamptz not null default now()
+);
+
+create table if not exists public.topico_palavras (
+    versao  text not null references public.topico_modelos (versao) on delete cascade,
+    topico  int  not null,
+    palavra text not null,
+    peso    double precision,
+    primary key (versao, topico, palavra)
+);
+
+create table if not exists public.anuncio_topicos (
+    anuncio_id bigint not null references public.anuncios (id) on delete cascade,
+    versao     text   not null references public.topico_modelos (versao) on delete cascade,
+    topico     int    not null,
+    proporcao  real,
+    primary key (anuncio_id, versao, topico)
+);
+
+-- Regravar a versão substitui tudo (apaga o modelo e, em cascata, palavras e misturas).
+-- p_modelo = {versao, versao_corpus, n_topicos, semente, n_docs, n_vocab, perplexidade};
+-- p_palavras = [{topico, palavra, peso}]; p_misturas = [{anuncio_id, topico, proporcao}]. Devolve quantas misturas gravou.
+create or replace function public.registrar_topicos(p_modelo jsonb, p_palavras jsonb, p_misturas jsonb)
+returns int
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+    v text := p_modelo ->> 'versao';
+    gravados int;
+begin
+    delete from public.topico_modelos where versao = v;
+
+    insert into public.topico_modelos (versao, versao_corpus, n_topicos, semente, n_docs, n_vocab, perplexidade)
+    values (v, p_modelo ->> 'versao_corpus', (p_modelo ->> 'n_topicos')::int, (p_modelo ->> 'semente')::int,
+            (p_modelo ->> 'n_docs')::int, (p_modelo ->> 'n_vocab')::int, (p_modelo ->> 'perplexidade')::double precision)
+    on conflict (versao) do update set
+        versao_corpus = excluded.versao_corpus, n_topicos = excluded.n_topicos, semente = excluded.semente,
+        n_docs = excluded.n_docs, n_vocab = excluded.n_vocab, perplexidade = excluded.perplexidade, criado_em = now();
+
+    insert into public.topico_palavras (versao, topico, palavra, peso)
+    select v, l.topico, l.palavra, l.peso
+    from jsonb_to_recordset(p_palavras) as l(topico int, palavra text, peso double precision)
+    on conflict (versao, topico, palavra) do update set peso = excluded.peso;
+
+    insert into public.anuncio_topicos (anuncio_id, versao, topico, proporcao)
+    select l.anuncio_id, v, l.topico, l.proporcao
+    from jsonb_to_recordset(p_misturas) as l(anuncio_id bigint, topico int, proporcao real)
+    on conflict (anuncio_id, versao, topico) do update set proporcao = excluded.proporcao;
+    get diagnostics gravados = row_count;
+    return gravados;
+end;
+$$;
+
+-- Por modelo, período legal e tópico: proporção média e nº de anúncios.
+create or replace view public.topicos_por_periodo with (security_invoker = true) as
+    select t.versao, a.periodo_legal, t.topico,
+           avg(t.proporcao) as proporcao_media, count(distinct t.anuncio_id) as n_anuncios
+    from public.anuncio_topicos t
+    join (select distinct on (id) id, periodo_legal from public.anuncios_completos
+          order by id, c_criado_em desc nulls last) a on a.id = t.anuncio_id  -- uma linha por anúncio (várias versões de campos)
+    group by t.versao, a.periodo_legal, t.topico;
+
+alter table public.topico_modelos enable row level security;
+alter table public.topico_palavras enable row level security;
+alter table public.anuncio_topicos enable row level security;
+
+revoke all on table public.topico_modelos, public.topico_palavras, public.anuncio_topicos, public.topicos_por_periodo
+    from anon, authenticated;
+revoke all on function public.registrar_topicos(jsonb, jsonb, jsonb) from public, anon, authenticated;
+
+grant select, insert, update, delete on table public.topico_modelos, public.topico_palavras, public.anuncio_topicos
+    to service_role;
+grant select on table public.topicos_por_periodo to service_role;
+grant execute on function public.registrar_topicos(jsonb, jsonb, jsonb) to service_role;

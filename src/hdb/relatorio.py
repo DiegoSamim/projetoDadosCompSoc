@@ -20,6 +20,21 @@ LIMITES = (
     "As contagens do panorama valem para o **acervo inteiro**, não só para a década pedida; "
     "acervos que cobrem mais de uma década aparecem sinalizados.",
     "Não há rótulos manuais: nenhum campo foi conferido por pessoas, então não há taxa de acerto medida.",
+    "A amostra não é aleatória: ela vem de páginas que contêm frases de busca (ex.: \"vende-se uma preta\"). "
+    "Mostra os anúncios que essas frases acham, então as proporções (tipo, sexo) não representam o jornal "
+    "inteiro. A redação dos anúncios mudou com o tempo, e algumas frases deixam de existir depois de certa data.",
+    "A listagem de cada busca vem em ordem de data, e só as primeiras páginas foram listadas. Por isso alguns "
+    "anos ficam sem páginas (ex.: no Jornal do Commercio de 1880–1889 há 1880, 1881 e 1885, e nada de 1886 a 1888; de 1850–1859 "
+    "só o de 1850).",
+    "Antes de 1831 a amostra vem sobretudo do Diário do Rio de Janeiro (1821) e do Diário Fluminense; os demais "
+    "períodos vêm do Jornal do Commercio. Parte da diferença entre períodos pode ser diferença de jornal.",
+    "Nos tipos aluguel, compra e venda, nem todo anúncio é de pessoa escravizada: \"criada\", \"rapariga\" e "
+    "\"ama\" não dizem a condição. Quando o texto não diz, a condição jurídica fica registrada como "
+    "`desconhecida`. A conferência manual por amostra está planejada, mas ainda não foi feita.",
+    "O OCR do Jornal do Commercio dos anos 1860–1880 é pior (confiança média perto de 63 a 67) e deixa palavras "
+    "quebradas. Anúncios vizinhos às vezes saem colados em um só.",
+    "Os tópicos (LDA) são padrões de palavras, não fatos históricos. Eles dependem do número de tópicos escolhido "
+    "e da leitura que se faz de cada grupo.",
 )
 
 CREDITOS = (
