@@ -1,6 +1,6 @@
 # Relatório metodológico da coleta
 
-Gerado em 25/11/2026 19:20. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
+Gerado em 25/11/2026 21:10. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
 
 ## 1. Regras da busca da HDB
 
@@ -45,6 +45,7 @@ Para cada termo e acervo: quantas ocorrências a HDB informa, quantas foram list
 | `"escrava fugida"` | 364568_05 | Jornal do Commercio (RJ) - 1860 a 1869 | 148 | 60 | 8 | 3 | 24/11/2026 00:20 | 24/11/2026 00:23 |
 | `"escrava fugida"` | 364568_06 | Jornal do Commercio (RJ) - 1870 a 1879 | 408 | 60 | 5 | 0 | 23/11/2026 22:59 | 23/11/2026 23:02 |
 | `"escrava fugida"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 444 | 60 | 5 | 0 | 23/11/2026 23:05 | 23/11/2026 23:08 |
+| `"escrava fugio"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 7 | 7 | 0 | 0 | 25/11/2026 19:23 | 25/11/2026 19:24 |
 | `"escravo fugido"` | 094170_02 | Diário do Rio de Janeiro (RJ) - 1860 a 1878 | 465 | 60 | 0 | 0 | 24/11/2026 00:52 | 24/11/2026 00:54 |
 | `"escravo fugido"` | 364568_04 | Jornal do Commercio (RJ) - 1850 a 1859 | 425 | 60 | 12 | 5 | 24/11/2026 00:12 | 24/11/2026 00:15 |
 | `"escravo fugido"` | 364568_05 | Jornal do Commercio (RJ) - 1860 a 1869 | 814 | 60 | 7 | 1 | 24/11/2026 00:18 | 24/11/2026 00:20 |
@@ -58,7 +59,9 @@ Para cada termo e acervo: quantas ocorrências a HDB informa, quantas foram list
 | `"fugio o escravo"` | 364568_06 | Jornal do Commercio (RJ) - 1870 a 1879 | 111 | 111 | 5 | 0 | 20/11/2026 18:02 | 20/11/2026 18:08 |
 | `"fugio o escravo"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 73 | 73 | 7 | 0 | 25/11/2026 14:24 | 25/11/2026 14:28 |
 | `"fugio o preto"` | 364568_03 | Jornal do Commercio (RJ) - 1840 a 1849 | 88 | 60 | 6 | 0 | 24/11/2026 00:31 | 24/11/2026 00:34 |
+| `"fugio o preto"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 14 | 14 | 0 | 1 | 25/11/2026 19:24 | 25/11/2026 19:25 |
 | `"fugio um escravo"` | 094170_01 | Diário do Rio de Janeiro (RJ) - 1821 a 1858 | 179 | 60 | 5 | 0 | 23/11/2026 23:36 | 23/11/2026 23:40 |
+| `"fugio uma escrava"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 3 | 3 | 0 | 0 | 25/11/2026 19:24 | 25/11/2026 19:24 |
 | `"preta com leite"` | 094170_01 | Diário do Rio de Janeiro (RJ) - 1821 a 1858 | 252 | 60 | 5 | 0 | 23/11/2026 23:32 | 23/11/2026 23:36 |
 | `"preta com leite"` | 364568_01 | Jornal do Commercio (RJ) - 1827 a 1829 | 9 | 9 | 3 | 0 | 20/11/2026 17:07 | 20/11/2026 17:08 |
 | `"preta com leite"` | 364568_02 | Jornal do Commercio (RJ) - 1830 a 1839 | 50 | 50 | 4 | 0 | 20/11/2026 17:29 | 20/11/2026 17:31 |
@@ -169,6 +172,15 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 299 págin
 - Sexo: (sem sexo): 30.517, f: 2.103, m: 1.763, ambos: 310
 - Com idade: 855; com nome: 326; com recompensa: 542
 - Nações mais comuns: Mina (77), Angola (61), Benguela (58), Moçambique (50), Cabinda (48), Congo (33), Moange (14), Inhambane (8), Monjolo (7), Rebolo (7)
+
+### Campos, versão c6
+
+34.693 anúncios.
+
+- Tipo: outro: 32.133, aluguel: 902, venda: 638, fuga: 540, ama_de_leite: 240, aluguel_incerto: 197, compra: 43
+- Sexo: (sem sexo): 30.517, f: 2.103, m: 1.763, ambos: 310
+- Com idade: 996; com nome: 326; com recompensa: 622
+- Nações mais comuns: Angola (61), Benguela (58), Moçambique (50), Cabinda (48), Congo (33), Mina (19), Moange (14), Inhambane (8), Monjolo (7), Rebolo (7)
 
 ## 6. Panorama de acervos
 

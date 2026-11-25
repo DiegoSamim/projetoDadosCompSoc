@@ -168,3 +168,26 @@ def test_nao_sobrescreve_arquivo_com_rotulos(sortear, tmp_path, capsys):
     assert sortear.main(["--forcar"], banco=b, saida=arq, textos=textos) == 0
     assert len(json.loads(arq.read_text())) == 120
     assert sortear.main([], banco=b, saida=arq, textos=textos) == 0  # sem rótulos: pode regravar
+
+
+def test_sorteio_exclui_o_gold_de_desenvolvimento(sortear):
+    gold = json.loads((Path(ARQUIVO).parents[1] / "tests" / "fixtures" / "campos_gold.json").read_text(encoding="utf-8"))
+    ids = sortear.ids_excluidos()
+    assert {i["id"] for i in gold} <= ids
+
+
+def test_sorteio_opcoes_fugas_alugueis_semente_saida(sortear, tmp_path):
+    b, textos = banco_simulado()
+    arq = tmp_path / "teste.json"
+    assert sortear.main(["--saida", str(arq), "--fugas", "5", "--alugueis", "0", "--semente", "7"],
+                        banco=b, textos=textos, excluir=set()) == 0
+    a = json.loads(arq.read_text(encoding="utf-8"))
+    assert len(a) == 20 and all(i["tipo"] == "fuga" for i in a)
+    assert all(sum(i["periodo"] == per for i in a) == 5 for per in validacao.PERIODOS)
+    sortear.main(["--saida", str(arq), "--fugas", "5", "--alugueis", "0", "--semente", "7"], banco=b, textos=textos, excluir=set())
+    assert json.loads(arq.read_text(encoding="utf-8")) == a  # reprodutível
+    sortear.main(["--saida", str(arq), "--fugas", "5", "--alugueis", "0", "--semente", "8"], banco=b, textos=textos, excluir=set())
+    assert json.loads(arq.read_text(encoding="utf-8")) != a
+    sortear.main(["--saida", str(arq), "--fugas", "2", "--alugueis", "3"], banco=b, textos=textos, excluir=set())
+    c = json.loads(arq.read_text(encoding="utf-8"))
+    assert len(c) == 20 and sum(i["tipo"] == "aluguel" for i in c) == 12

@@ -355,7 +355,7 @@ for ax, n in zip(eixos.ravel(), nomes_ok):
                 continue
             x = i + (k - 1.5) * 0.09
             xs.append(x); ys.append(c["valor"]); lo.append(c["valor"] - c["baixo"]); hi.append(c["alto"] - c["valor"])
-            ax.errorbar(x, c["valor"], yerr=[[lo[-1]], [hi[-1]]], fmt="o", color=CORES[v], capsize=2, ms=4,
+            ax.errorbar(x, c["valor"], yerr=[[max(lo[-1], 0)], [max(hi[-1], 0)]], fmt="o", color=CORES[v], capsize=2, ms=4,
                         mfc="white" if c["neff"] < MIN_N else CORES[v])
         ax.plot(xs, ys, color=CORES[v], lw=1, alpha=0.8, label=v)
     ax.set_xticks(range(len(PERIODOS)))

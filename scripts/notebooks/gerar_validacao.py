@@ -140,7 +140,7 @@ else:
             if pos == 0:
                 continue
             v, lo, hi = wilson(c["vp"], pos)
-            ax.errorbar(i, v, yerr=[[v - lo], [hi - v]], color="#0072B2", capsize=3, lw=1.2)
+            ax.errorbar(i, v, yerr=[[max(v - lo, 0)], [max(hi - v, 0)]], color="#0072B2", capsize=3, lw=1.2)
             ax.plot(i, v, "o", color="#0072B2", mfc="white" if pos < MIN_N else "#0072B2", ms=7, zorder=3)
         ax.set_xticks(range(len(PERIODOS)))
         ax.set_xticklabels([periodo_curto(p).replace("antes de ", "<") for p in PERIODOS], rotation=30, ha="right")
@@ -199,6 +199,51 @@ else:
     display(pd.DataFrame(linhas).set_index(["Campo", "Fonte"]))
 ''')
 com("c2b")
+
+md("""
+## 2c. Conjunto de teste: 60 fugas que as regras nunca viram
+As regras de recompensa, nação e idade foram corrigidas olhando os erros do conjunto acima (**desenvolvimento**), então os números dele só mostram que
+a regra aprendeu o que viu. O **conjunto de teste** (`tests/fixtures/campos_teste.json`, 15 fugas por período, sem repetir nenhuma do desenvolvimento) foi
+**rotulado antes de rodar o código novo nele**; é a medida que vale. Abaixo, o código novo no teste e, juntando os dois conjuntos, a **verdade rotulada**
+(sem depender do código) por período, com o teste exato de Fisher entre o primeiro e o último.
+""")
+code('''
+ARQ_T = RAIZ / "tests" / "fixtures" / "campos_teste.json"
+teste = [g for g in json.loads(ARQ_T.read_text(encoding="utf-8")) if g.get("rotulos")] if ARQ_T.exists() else []
+if not teste:
+    display(Markdown("_Sem conjunto de teste rotulado._"))
+else:
+    from scipy.stats import fisher_exact
+    RT = validacao.comparar(teste)
+    linhas = []
+    for campo, nome in CAMPOS[:4]:
+        m = validacao.metricas(RT[campo][validacao.TOTAL])
+        linhas.append({"Campo": nome, "Precisão [IC 95%]": fmt(m["precisao"]), "Cobertura [IC 95%]": fmt(m["cobertura"])})
+    print(f"{len(teste)} fugas de teste")
+    display(pd.DataFrame(linhas).set_index("Campo"))
+
+    def tem(g, campo):
+        r = g["rotulos"]
+        return bool(r["nacoes"]) if campo == "nacao" else (r["idade"] is not None if campo == "idade" else bool(r[campo]))
+    def vistas(g, campo):
+        e = validacao.extrair_para_comparar(g["texto"])
+        return bool(e["nacoes"]) if campo == "nacao" else (e["idade"] is not None if campo == "idade" else bool(e[campo]))
+    fugas_dev = [g for g in rotulados if g["tipo"] == "fuga"]
+    linhas = []
+    for campo, nome in (("recompensa", "Recompensa"), ("nacao", "Nação citada"), ("marcas", "Marcas no corpo"), ("idade", "Idade citada")):
+        for fonte, conj, fn in (("código, teste", teste, vistas), ("verdade, teste", teste, tem), ("verdade, teste + desenvolvimento", teste + fugas_dev, tem)):
+            ks = []
+            for per in PERIODOS:
+                gp = [g for g in conj if periodo_curto(g["periodo"]) == per]
+                ks.append((sum(fn(g, campo) for g in gp), len(gp)))
+            (k1, n1), (k2, n2) = ks[0], ks[-1]
+            p = fisher_exact([[k1, n1 - k1], [k2, n2 - k2]])[1]
+            linhas.append({"Campo": nome, "Fonte": fonte,
+                           **{per: f"{k}/{n} ({100 * k / n:.0f}%)" for per, (k, n) in zip(PERIODOS, ks)},
+                           "p (1º × último)": "<0,001" if p < 0.001 else f"{p:.3f}".replace(".", ",")})
+    display(pd.DataFrame(linhas).set_index(["Campo", "Fonte"]))
+''')
+com("c2c")
 
 md("""
 ## 3. Onde o código erra

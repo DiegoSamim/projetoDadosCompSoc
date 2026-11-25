@@ -1,6 +1,6 @@
 # Resumo dos dados
 
-Gerado em 2026-11-25 a partir do banco. Versões: campos `c5`, corpus `corp3`, tópicos `t5`. Todos os números são lidos do banco.
+Gerado em 2026-11-25 a partir do banco. Versões: campos `c6`, corpus `corp3`, tópicos `t5`. Todos os números são lidos do banco.
 
 ## Anúncios por período e tipo
 
@@ -35,17 +35,17 @@ Nove afirmações fixadas antes de olhar os resultados. Cada uma compara o últi
 
 | # | Afirmação | Natureza | Base | Valor base → último (bruta) | Valor base → último (só JC) | Diferença [IC 95%] (bruta / só JC / ajustada) | p aj. | Forma | Veredito | Motivo |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 | A recompensa nas fugas diminui | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 55,9 → 22,6 | 60,2 → 22,6 | -33,3 [-47,8; -19,0] / -37,6 [-50,7; -25,6] | <0,001 | um degrau | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
-| 2 | A nação citada nas fugas diminui | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 52,9 → 2,2 | 45,4 → 2,2 | -50,8 [-63,2; -38,7] / -43,2 [-52,6; -34,1] | <0,001 | gradual | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
+| 1 | A recompensa nas fugas diminui | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 66,2 → 25,8 | 65,7 → 25,8 | -40,4 [-55,0; -25,6] / -39,9 [-53,2; -27,4] | <0,001 | gradual | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
+| 2 | A nação citada nas fugas diminui | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 63,2 → 0,0 | 50,0 → 0,0 | -63,2 [-75,0; -51,5] / -50,0 [-59,3; -40,7] | <0,001 | gradual | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
 | 3 | As marcas no corpo nas fugas diminuem | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 48,5 → 17,2 | 21,3 → 17,2 | -31,3 [-45,6; -16,8] / -4,1 [-15,0; 6,8] | <0,001 | um degrau | **parcial** | Mesmo sinal em todas as visões, mas o intervalo da diferença contém zero na visão só JC. |
-| 4 | A idade mediana dos fugidos aumenta | dentro do tipo | 1831–1850 | 21,5 → 30,0 | 21,5 → 30,0 | 8,5 [-0,2; 14,0] / 8,5 [-0,2; 14,0] anos | 0,007 | um degrau | **frágil** | Na visão bruta o último período tem menos de 30 anúncios (n ou n efetivo). |
+| 4 | A idade mediana dos fugidos aumenta | dentro do tipo | 1831–1850 | 20,8 → 29,0 | 20,8 → 29,0 | 8,2 [1,5; 14,0] / 8,2 [1,5; 14,0] anos | <0,001 | gradual | **frágil** | Na visão bruta o último período tem menos de 30 anúncios (n ou n efetivo). |
 | 5 | A parcela feminina dos aluguéis aumenta | dentro do tipo | 1831–1850 | 55,8 → 68,9 | 55,6 → 68,9 | 13,1 [2,8; 23,3] / 13,4 [2,4; 23,8] | 0,016 | gradual | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
 | 6 | A fuga perde peso entre os anúncios | mistura da amostra | antes de 1831 | 44,7 → 23,9 | 28,8 → 23,9 | -20,8 [-29,9; -11,8] / -4,9 [-17,5; 7,6] | <0,001 | um degrau | **parcial** | Mesmo sinal em todas as visões, mas o intervalo da diferença contém zero na visão só JC. |
 | 7 | Os temas de fuga perdem peso | tema (acompanha o tipo) | antes de 1831 | 46,3 → 25,2 | 31,7 → 25,2 | -21,1 [-28,9; -13,5] / -6,5 [-17,3; 4,4] / -2,6 [-10,3; 3,8] | 0,877 | um degrau | **não sustentada** | Igualando a mistura de tipos, o intervalo da diferença contém zero: a tendência bruta do tema é, em boa parte, mistura de tipos. |
 | 8 | O serviço doméstico ganha peso | tema (acompanha o tipo) | antes de 1831 | 28,0 → 42,8 | 35,5 → 42,8 | 14,8 [8,4; 21,4] / 7,3 [-2,8; 17,0] / -6,4 [-15,1; 3,6] | <0,001 | um degrau | **não sustentada** | O sinal da diferença muda ou some na visão ajustada. |
 | 9 | A ama de leite perde peso | tema (acompanha o tipo) | antes de 1831 | 17,4 → 11,2 | 22,4 → 11,2 | -6,1 [-11,1; -1,4] / -11,2 [-20,0; -2,7] / -3,2 [-8,2; 1,7] | <0,001 | gradual | **não sustentada** | Igualando a mistura de tipos, o intervalo da diferença contém zero: a tendência bruta do tema é, em boa parte, mistura de tipos. |
 
-**Ressalva de leitura (caderno `validacao_campos`).** Os campos são extraídos do texto por regras, e o código perde parte deles. Conferido à mão em 20 fugas por período: a **nação citada** e as **marcas no corpo** caem de fato; a **queda da recompensa** que o código mostra é **maior que a real** (o código perde mais recompensas nos períodos recentes), e a **alta da idade citada** vem em boa parte de o código achar poucas idades nos anúncios mais antigos. A afirmação 1 deve ser tratada como possível, não como medida; a 4, como frágil.
+**Ressalva de leitura (caderno `validacao_campos`).** Os campos são extraídos do texto por regras, e o código perde parte deles (no conjunto de teste, acha 77% das recompensas, 100% das nações citadas e 86% das idades). Conferido à mão (35 fugas por período, rótulos de Claude): a **queda da recompensa** (80% para 40%), a da **nação citada** (63% para 0%) e a das **marcas no corpo** (66% para 20%) são reais; o **nível** que o código mostra para a recompensa é menor que o real, então vale como tendência. A **alta da idade** continua frágil: o último período tem poucas idades e a própria fração de fugas que citam idade muda (23% para 51%).
 
 ## Sinais principais
 
@@ -53,10 +53,10 @@ Nove afirmações fixadas antes de olhar os resultados. Cada uma compara o últi
 
 | Período | Anúncios de fuga | Com recompensa |
 |---|---|---|
-| antes de 1831 | 80 | 52% |
-| 1831–1850 | 123 | 59% |
-| 1850–1871 | 212 | 30% |
-| 1871–1888 | 125 | 17% |
+| antes de 1831 | 80 | 61% |
+| 1831–1850 | 123 | 65% |
+| 1850–1871 | 212 | 40% |
+| 1871–1888 | 125 | 20% |
 
 _Ressalva: períodos com poucos anúncios variam muito; a amostra vem de frases de busca._
 
@@ -77,10 +77,10 @@ _Ressalva: o sexo vem de palavras do texto; "ama de leite" é feminino por const
 
 | Período | Anúncios com nação | Mais citadas |
 |---|---|---|
-| antes de 1831 | 48 | Moçambique (29%), Benguela (23%), Cabinda (15%) |
-| 1831–1850 | 67 | Cabinda (25%), Mina (22%), Moçambique (19%) |
-| 1850–1871 | 44 | Angola (20%), Mina (16%), Benguela (16%) |
-| 1871–1888 | 3 | Mina (67%), Congo (33%) |
+| antes de 1831 | 60 | Moçambique (23%), Benguela (18%), Cabinda (12%) |
+| 1831–1850 | 74 | Cabinda (23%), Moçambique (18%), Benguela (16%) |
+| 1850–1871 | 51 | Angola (18%), Benguela (14%), Moçambique (14%) |
+| 1871–1888 | 1 | Congo (100%) |
 
 _Ressalva: nação é o que o anunciante escreveu; muda de uso ao longo do século._
 
@@ -88,12 +88,12 @@ _Ressalva: nação é o que o anunciante escreveu; muda de uso ao longo do sécu
 
 | Tipo | Com idade | Idade mediana (anos) |
 |---|---|---|
-| venda | 179 | 18,0 |
-| fuga | 130 | 23,0 |
-| aluguel | 31 | 16,0 |
-| ama_de_leite | 26 | 19,0 |
-| aluguel_incerto | 10 | 12,0 |
-| compra | 3 | 7,0 |
+| venda | 188 | 17,0 |
+| fuga | 156 | 21,5 |
+| aluguel | 37 | 16,0 |
+| ama_de_leite | 27 | 19,0 |
+| aluguel_incerto | 13 | 12,0 |
+| compra | 4 | 9,5 |
 
 _Ressalva: a idade é a que o anunciante disse (em geral aproximada)._
 

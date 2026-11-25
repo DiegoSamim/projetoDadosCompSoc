@@ -318,8 +318,8 @@ def c4(texto, abertura):
     return extrair_anuncio({"texto": texto, "abertura": abertura})
 
 
-def test_versao_c5():  # c5: fuga e "outro" exigem pessoa (ver NAO_PESSOA)
-    assert VERSAO_CAMPOS == "c5"
+def test_versao_c6():  # c6: recompensa, nação e idade aceitam mais erros de OCR (ver `_recompensa`, `_nacoes`, `ANOS`)
+    assert VERSAO_CAMPOS == "c6"
 
 
 @pytest.mark.parametrize("texto,abertura", [
@@ -514,3 +514,73 @@ def test_c5_documento_oficial_fumo_e_cavalo_mal_lido_nao_sao_pessoa():
     assert classificar({"texto": "VENDE-SE na rua de S. José n. 155, rapé arêa e meio, pagando-se o premio que se convencionar, preta e princeza de superior qualidade", "abertura": "VENDE-SE"})[0] == "outro"
     assert classificar({"texto": "VENDE-SE hum cavalio castanho, de 7 palmos de alto, manço e muito bonito, proprio para huma carruagem; na rua Ourives n. 79", "abertura": "VENDE-SE"})[0] == "outro"
     assert classificar({"texto": "VENDE-SE hum preto de 20 annos, bom cozinheiro, sem vicios; na rua do Ouvidor n. 12 — vende-se tambem hum cavallo russo", "abertura": "VENDE-SE"})[0] == "venda"
+
+
+# --- c6: recompensa, nação e idade com o OCR sujo (trechos reais do conjunto de desenvolvimento) ---
+
+@pytest.mark.parametrize("texto", [
+    "quem o condusir, e entregar a este novo so phorio, será recompençado do seu trabalho",
+    "quem delle souber queira participar ao mesmo Carcereiro, que recompençarã o trabalho,",
+    "terá à bondade do levar á rua da Caudelaria n. 18º, em freute à igreja , que será recempensado, . JOAO",
+    "se lhe ficará obrigado, e se recompensari q seu trabalho.",
+    "e levar à rua do Hospicio n. 16, será bem gralificado.",
+    "quem o levar ao dito corinme será gratiticado. E",
+    "será bem gratilicado, Eee A) 7 N",
+    "Gratifi tin acima a quem appretender",
+    "dando se contento para veuder-se; quem a apprebender 8 leva-la á rua de 8. José n. 60 será bom grati: ficado",
+    "que será recom= pensados pelo trabalho", "será gratifi- cado", "receberá alvi- çaras", "promettendo-se até 100 18 de aiviçaras",
+    "receberá boas tlviçaras em casa de Antonio", "dar-se-ha alvizaras", "receberá de premio 32:000",
+])
+def test_recompensa_com_ocr_sujo(texto):
+    r = extrair(texto)
+    assert r["recompensa"] is True and r["evidencias"]["recompensa"]
+
+
+@pytest.mark.parametrize("texto", [
+    "quem a achar será pago", "ficará muito obrigado a quem o trouxer", "pagamento do seu trabalho", "pago o seu trabalho",
+    "quem a achar leve a rua do Ouvidor", "30$000 de pensão por mez",
+])
+def test_recompensa_nao_pega_pagamento_nem_obrigado(texto):
+    assert extrair(texto)["recompensa"] is False
+
+
+@pytest.mark.parametrize("texto,nacoes", [
+    ("huma escrava por nome Maria\", Nação, Gangue: la, gorda, estatura", ["Gangue"]),
+    ("fugio bum preto de Nação Songo, estatura ordinaria", ["Songo"]),
+    ("hum preto de nação Mucena , de nome Francisco", ["Mucena"]),
+    ("o preto Paula de nação Calango, estatara Vaixa", ["Calango"]),
+    ("hum preto. Nação Banbuillo ;.eg= atura ordinaria", ["Banbuillo"]),
+    ("por nome Just, de nação Cabiudu; * Votou huintá argola", ["Cabiudu"]),
+    ("huma preta de Nação Nova", ["Nova"]),
+    ("de Nação Portugueza, que sabe lavar", []), ("a Nação Ingleza", []), ("de nação Mina", ["Mina"]),
+    ("Nação Mina", ["Mina"]), ("Nação de Mina", ["Mina"]), ("huma de nação, baixa e magra", []),
+    ("Nação Sao", []),  # menos de 4 letras
+    ("levou vestido calça e camisa de algodao de Minas, é crioulo", []),
+    ("vestido de riscado de Mina, calças de brim", []), ("crioulo de Minas Geraes", []),
+])
+def test_nacao_citada_mesmo_desconhecida(texto, nacoes):
+    assert extrair(texto)["nacoes"] == nacoes
+
+
+@pytest.mark.parametrize("texto,faixa", [
+    ("hum escravo, idade 20 e tantos annes; quitandeiro", (20, 29)),
+    ("hum escravo, idade 20 e tantos; quitandeiro", (20, 29)),
+    ("escravo com os signaes, idade poúto mais ou'menos 18\"annds;, Chamado Domingos", (18, 18)),
+    ("preto Casimiro, idade pouco mais ou menos 18", (18, 18)), ("idade de 18", (18, 18)), ("idade 30", (30, 30)),
+    ("um preto de nação Moçambique, de 30 à 40 unos, de altura regular", (30, 40)),
+    ("hum pardo de nome Juão, idade 14 uunos , que paresse caboculo", (14, 14)),
+    ("por nome Virgolino, de idade de 10 a 14 ennos, tem na cabeça", (10, 14)),
+    ("hum criouloglesta Cidade , de nome Antonio, terá de idade 20 aunus, com hum risco", (20, 20)),
+    ("20 e poucos annds", (20, 29)), ("terá 20 e tantos aunos", (20, 29)), ("tem 48 ou 50 aunos, é mu velhaco", (48, 50)),
+    ("terá de idade 20 a 24 amos, levou vestido", (20, 24)), ("de idade 40 asno", (40, 40)),
+    # o que não é idade
+    ("Fugio ha 4 annos hum preto", (None, None)), ("ha 4 annos fugio", (None, None)),
+    ("fugio ha 2 para 3 annos", (None, None)),
+    ("no anno de 1843 fugio hum preto", (None, None)), ("30$000 de gratificação", (None, None)),
+    ("idade 30$000 de gratificação", (None, None)), ("de idade, ha 8 dias fugio", (None, None)),
+    ("idade 10 de Maio", (None, None)), ("20 avos do total", (None, None)), ("sua idade e 150", (None, None)),
+    ("Fugio huma preta com 3 uns filhos", (None, None)), ("rua do Ouvidor 12 anos", (12, 12)),
+])
+def test_idade_com_ocr_sujo(texto, faixa):
+    r = extrair(texto)
+    assert (r["idade_min"], r["idade_max"]) == faixa

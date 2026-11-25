@@ -1,12 +1,13 @@
 """Sorteia os anúncios que serão rotulados à mão para validar os campos (recompensa, nação, idade, sexo, marcas).
 
-Sorteia 80 fugas (20 por período legal) e 40 aluguéis (10 por período) do corpus, com semente fixa, fora os ids
-das conferências anteriores. Grava tests/fixtures/campos_gold.json: lista de {"id", "periodo", "tipo", "texto"}, com o
+Sorteia fugas (--fugas por período legal, padrão 20) e aluguéis (--alugueis por período, padrão 10; 0 não sorteia
+nenhum) do corpus, com semente fixa (--semente), fora os ids das conferências anteriores e do próprio
+tests/fixtures/campos_gold.json (o conjunto de desenvolvimento). Grava em --saida (padrão: o gold): lista de {"id", "periodo", "tipo", "texto"}, com o
 texto ORIGINAL (espaços normalizados, até 700 caracteres) e sem rótulos nem o que o código extraiu. Quem rotula
 acrescenta a chave `rotulos` (formato em hdb.validacao). Não sobrescreve arquivo com rótulos, a não ser com --forcar.
 Só lê o banco.
 
-Uso: PYTHONPATH=src python scripts/sortear_campos.py [--forcar]
+Uso: PYTHONPATH=src python scripts/sortear_campos.py [--saida ARQ] [--fugas N] [--alugueis N] [--semente S] [--forcar]
 """
 import argparse
 import hashlib
@@ -35,7 +36,7 @@ def periodo_curto(p):
     return p if p.startswith("antes") else p.split(" ")[0]
 
 
-def ids_excluidos(arquivos=CONFERENCIAS):
+def ids_excluidos(arquivos=CONFERENCIAS + (SAIDA,)):
     ids = set()
     for a in arquivos:
         if Path(a).exists():
@@ -81,17 +82,24 @@ def tem_rotulos(arquivo):
         return False
 
 
-def main(argv=None, banco=None, saida=SAIDA, textos=None):
+def main(argv=None, banco=None, saida=None, textos=None, excluir=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--saida", default=None, help=f"arquivo de saída (padrão: {SAIDA})")
+    ap.add_argument("--fugas", type=int, default=PEDIDOS["fuga"], help="fugas por período (padrão 20)")
+    ap.add_argument("--alugueis", type=int, default=PEDIDOS["aluguel"], help="aluguéis por período (padrão 10; 0 = nenhum)")
+    ap.add_argument("--semente", type=int, default=SEMENTE)
     ap.add_argument("--forcar", action="store_true", help="sobrescreve o arquivo mesmo com rótulos")
     args = ap.parse_args(argv)
+    saida = Path(args.saida or saida or SAIDA)
+    pedidos = {t: n for t, n in (("fuga", args.fugas), ("aluguel", args.alugueis)) if n > 0}
     if tem_rotulos(saida) and not args.forcar:
         print(f"{saida} já tem rótulos (chave `rotulos`); não sobrescrevo. Use --forcar para sobrescrever.")
         return 1
     if banco is None:
         from hdb.banco import BancoSupabase
         banco = BancoSupabase()
-    itens = sortear(banco, textos if textos is not None else ler_textos(banco), ids_excluidos())
+    itens = sortear(banco, textos if textos is not None else ler_textos(banco),
+                    ids_excluidos() if excluir is None else excluir, semente=args.semente, pedidos=pedidos)
     Path(saida).write_text(json.dumps(itens, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"{len(itens)} anúncios gravados em {saida}")
     return 0

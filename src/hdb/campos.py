@@ -112,6 +112,8 @@ NACOES = {  # forma padronizada -> grafias (sem acento) além dela mesma
 NACAO_FORMAS = {forma: nome for nome, formas in NACOES.items() for forma in formas}
 NACAO_AMBIGUAS = {"mina"}  # só vale com inicial maiúscula
 NAO_NACOES = {"rebelo", "angela", "angelo"}  # nomes de gente a 1 erro de uma nação
+TECIDOS = {"algodao", "riscado", "chita", "la", "pano", "camisa", "calca", "calcas", "vestido", "jaqueta", "brim", "ganga"}
+NACAO_ANTES = re.compile(r"\bnac[aio]{1,2}\s*[,.:;]?\s*$")  # "nação", "naçio", "nação," antes da palavra
 
 OFICIOS = (  # (regex, forma padronizada) sobre o texto sem acento
     (r"cozinheir[oa]s?", None), (r"lavadeiras?", "lavadeira"), (r"engom+adeiras?", "engommadeira"),
@@ -124,15 +126,24 @@ OFICIOS = (  # (regex, forma padronizada) sobre o texto sem acento
 OFFICIAL_DE = re.compile(r"\bof+i[cs]i?al\s+de\s+([a-z]{4,})")
 NAO_OFICIOS = {"justica", "fazenda", "marinha", "secretaria", "diligencias", "gabinete"}
 
-RECOMPENSA = re.compile(r"gratific|alvicara|alvissara|\bpremio|recompensa")
+RECOMPENSA = re.compile(r"gratific|alvicara|alvissara|\bpremio|recompensa")  # só para classificar (`_achar_com_premio`)
+# c6: o campo `recompensa` aceita mais grafias do OCR (ver `_recompensa`); "pagamento", "pago" e "obrigado" soltos não valem
+RECOMPENSA_CAMPO = re.compile(r"gratifi|gralific|gratitic|gratiric|alvi[csz]ara|recompen[sc]|\bpremio")
+RECOMPENSA_PARTIDA = re.compile(r"(?<=[a-z])[-=:]\s+(?=[a-z])")  # "recom= pensados", "gratifi- cado"
+RECOMPENSA_PALAVRAS = ("gratificado", "gratificacao", "gratificar", "recompensado", "recompensa", "recompensar", "alvicaras")
+RECOMPENSA_LETRAS_MINIMAS = 8  # só palavras com 8 letras ou mais toleram 1 erro de OCR
 VALOR = re.compile(r"(?<![\w:$])(\d{1,3}(?::\d{3})+(?:\$\d{1,3})?|\d{1,4}\$\d{0,3}|\d{1,3}s)(?!\w)")
 ENDERECO = re.compile(  # até 45 caracteres entre o logradouro e o "n. 12"; "S." (santo) não fecha a frase
     r"\b(?:rua|largo|beco|praia|travessa|campo|praca|ladeira)\b(?:[^;.:\n]|\bs\.){0,45}?\bn\b[.,]?\s*[º°o]?\.?\s*\d+")
 
 TEMPO_ANTES = re.compile(r"\b(?:ha|a|faz|fazem|desde|cerca\s+de|perto\s+de)\s+$")  # "ha 2 para 3 annos": tempo, não idade
-ANOS = r"a[nu]{1,2}[o0]s\b"
+# c6: "annos" com erro de OCR (annes, annds, unos, uunos, aunus, ennos, anvos, asno, amos), só depois de número
+ANOS = (r"(?:a[nu]{1,2}[o0]s|(?!avos\b)(?=\w{4})[aeu][nuv]{1,3}[oesd0u]{1,2}s?|asno|am[o0]s)\b")
 IDADE_TANTOS = re.compile(rf"(?<![\d:$])(\d{{1,2}})\s+e\s+(?:tantos|poucos)\s+{ANOS}")
 IDADE = re.compile(rf"(?<![\d:$.])(\d{{1,2}})(?:\s*(?:a|para|ate|ou|e)\s*(\d{{1,2}}))?\s*{ANOS}")
+IDADE_DE = re.compile(  # "idade 20 e tantos", "idade de 18", "idade pouco mais ou menos 18": sem "annos"
+    r"\bidade\b[^\d;.:$]{0,24}?(?<![\d:$.])(\d{1,2})(?:\s+e\s+(tantos|poucos)\b|(?:\s*(?:a|para|ate|ou|e)\s*(\d{1,2}))?)"
+    r"(?![\d:$.,/]|\s*(?:[$:/]|dias?\b|mez|horas?\b|vezes\b|rs\b|de\s+(?:jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)))")
 IDADE_OUTRO = re.compile(  # "hum de 10 à 12 annos, outro de 16 a 18": a 2ª idade vem sem "annos"
     r"\b(?:outr[oa]s?|ou[a-z]{2,3})\s+de\s+(\d{1,2})(?:\s*(?:a|para)\s*(\d{1,2}))?(?![\d:$])")
 
@@ -228,6 +239,18 @@ def _fugio_mal_lido(norm):
         return False
     palavra = tokens[0][0]
     return any(distancia(palavra, f) <= (2 if palavra[3:] in ("io", "iu") else 1) for f in ("fugio", "fugiu"))
+
+
+def _recompensa(norm):
+    """O trecho (do texto sem acento, com as palavras partidas juntadas) que mostra recompensa, ou None."""
+    juntado = RECOMPENSA_PARTIDA.sub("", norm)
+    m = RECOMPENSA_CAMPO.search(juntado)
+    if m:
+        return juntado[m.start():m.end()]
+    for palavra in re.findall(r"[a-z]{%d,}" % RECOMPENSA_LETRAS_MINIMAS, juntado):
+        if any(abs(len(palavra) - len(f)) <= 1 and distancia(palavra, f) <= 1 for f in RECOMPENSA_PALAVRAS):
+            return palavra
+    return None
 
 
 def _achar_com_premio(norm):
@@ -435,18 +458,33 @@ def _intervalo(m):
 
 def _idade(texto, norm):
     """(min, max, trecho) ou (None, None, None); descarta tempo decorrido ("ha 2 para 3 annos")."""
-    intervalos, trechos = [], []
+    intervalos, trechos, cobertos = [], [], []
     fim = 0
     for m in IDADE_TANTOS.finditer(norm):
         a = int(m.group(1))
         if a <= IDADE_MAXIMA:
             intervalos.append((a, a + 9))
             trechos.append(texto[m.start():m.end()])
+            cobertos.append(m.span())
             fim = max(fim, m.end())
     for m in IDADE.finditer(norm):
         if TEMPO_ANTES.search(norm[max(0, m.start() - 20):m.start()]):
             continue
         intervalo = _intervalo(m)
+        if intervalo:
+            intervalos.append(intervalo)
+            trechos.append(texto[m.start():m.end()])
+            cobertos.append(m.span())
+            fim = max(fim, m.end())
+    for m in IDADE_DE.finditer(norm):
+        if any(i < m.end(1) and m.start(1) < f for i, f in cobertos):
+            continue  # já veio com "annos"
+        a = int(m.group(1))
+        if m.group(2):
+            intervalo = (a, a + 9) if a <= IDADE_MAXIMA else None
+        else:
+            b = int(m.group(3)) if m.group(3) else a
+            intervalo = (min(a, b), max(a, b)) if max(a, b) <= IDADE_MAXIMA else None
         if intervalo:
             intervalos.append(intervalo)
             trechos.append(texto[m.start():m.end()])
@@ -474,8 +512,22 @@ def _nacao(palavra, original):
     return NACAO_FORMAS[forma] if d <= NACAO_ERROS else None
 
 
+def _mina_de_tecido_ou_lugar(raw, tokens, k):
+    """"algodão de Minas", "riscado de Mina", "camisa de Minas": roupa ou província, não nação (c6)."""
+    antes = tokens[k - 2][0] if k >= 2 else ""
+    if antes.startswith("nac"):
+        return False  # "nação de Mina"
+    return raw.endswith("s") or antes in TECIDOS
+
+
+def _citada_depois_de_nacao(norm, texto, i, j):
+    """Palavra com inicial maiúscula logo depois de "nação" (ou "de nação"), mesmo desconhecida (c6)."""
+    return (j - i >= 4 and texto[i:i + 1].isupper() and NACAO_ANTES.search(norm[max(0, i - 12):i])
+            and not NACIONALIDADE_LIVRE.search(norm[i:j]))
+
+
 def _nacoes(texto, norm):
-    """([nações padronizadas], [palavras do texto que as justificaram])."""
+    """([nações padronizadas ou citadas como escritas], [palavras do texto que as justificaram])."""
     achadas = []
     tokens = _tokens(norm)
     for k, (raw, i, j) in enumerate(tokens):
@@ -483,9 +535,13 @@ def _nacoes(texto, norm):
         anterior = tokens[k - 1][0] if k else ""
         if palavra in NACAO_AMBIGUAS and not (anterior.startswith("na") or anterior in ("de", "da")):
             continue  # "Mina" sozinha pode ser tudo; vale depois de "nação"/"naçio" ou "de"
+        if palavra in NACAO_AMBIGUAS and anterior in ("de", "da") and _mina_de_tecido_ou_lugar(raw, tokens, k):
+            continue
         nome = _nacao(palavra, texto[i:j])
         if nome:
             achadas.append((nome, texto[i:j]))
+        elif palavra not in NAO_NACOES and _citada_depois_de_nacao(norm, texto, i, j):
+            achadas.append((texto[i:j], texto[i:j]))
     return _sem_repetir(n for n, _ in achadas), _sem_repetir(t for _, t in achadas)
 
 
@@ -556,9 +612,9 @@ def extrair(texto):
     oficios = _oficios(texto, norm)
     if oficios:
         evidencias["oficios"] = ", ".join(oficios)
-    m = RECOMPENSA.search(norm)
-    if m:
-        evidencias["recompensa"] = texto[m.start():m.end()]
+    trecho = _recompensa(norm)
+    if trecho:
+        evidencias["recompensa"] = trecho
     m = VALOR.search(norm)
     valor = texto[m.start(1):m.end(1)] if m else None
     if valor:

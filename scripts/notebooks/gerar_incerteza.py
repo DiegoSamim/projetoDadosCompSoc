@@ -263,7 +263,7 @@ for ax, n in zip(eixos.ravel(), nomes_ok):
         c = r["por"][p]
         if c["n"] == 0:
             continue
-        ax.errorbar(i, c["valor"], yerr=[[c["valor"] - c["baixo"]], [c["alto"] - c["valor"]]], fmt="o", color=COR,
+        ax.errorbar(i, c["valor"], yerr=[[max(c["valor"] - c["baixo"], 0)], [max(c["alto"] - c["valor"], 0)]], fmt="o", color=COR,
                     ecolor=COR, capsize=3, mfc="white" if c["n"] < MIN_N else COR)
     ax.set_xticks(range(len(PERIODOS)))
     ax.set_xticklabels([p.replace("antes de ", "<") for p in PERIODOS], fontsize=8)

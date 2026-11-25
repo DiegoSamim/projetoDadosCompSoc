@@ -151,11 +151,12 @@ def _quadro(dados):
             "o intervalo inclui zero em alguma; **não sustentada** = o sentido muda ou contraria a frase; **frágil** = poucos "
             "anúncios. As afirmações 6 a 9 descrevem a amostra (mistura de tipos e temas), não achados históricos. "
             "Detalhes no caderno `afirmacoes`.\n\n" + afirmacoes.formatar(q)
-            + "\n\n**Ressalva de leitura (caderno `validacao_campos`).** Os campos são extraídos do texto por regras, e o código "
-            "perde parte deles. Conferido à mão em 20 fugas por período: a **nação citada** e as **marcas no corpo** caem de "
-            "fato; a **queda da recompensa** que o código mostra é **maior que a real** (o código perde mais recompensas nos "
-            "períodos recentes), e a **alta da idade citada** vem em boa parte de o código achar poucas idades nos anúncios mais "
-            "antigos. A afirmação 1 deve ser tratada como possível, não como medida; a 4, como frágil.")
+            + "\n\n**Ressalva de leitura (caderno `validacao_campos`).** Os campos são extraídos do texto por regras, e o código perde parte deles "
+            "(no conjunto de teste, acha 77% das recompensas, 100% das nações citadas e 86% das idades). Conferido à mão (35 fugas por "
+            "período, rótulos de Claude): a **queda da recompensa** (80% para 40%), a da **nação citada** (63% para 0%) e a das **marcas "
+            "no corpo** (66% para 20%) são reais; o **nível** que o código mostra para a recompensa é menor que o real, então vale como "
+            "tendência. A **alta da idade** continua frágil: o último período tem poucas idades e a própria fração de fugas que citam "
+            "idade muda (23% para 51%).")
 
 
 def _sinais(anuncios):
