@@ -5,7 +5,7 @@ Uso: python scripts/rodar_tudo.py [--rapido] [--sem-notebooks] [--so PASSO]
 Passos, em ordem: campos, corpus, corpus_i, topicos, topicos_i, estabilidade, relatorio, resumo, notebooks.
 O passo `resumo` escreve resumo_dados.md (scripts/resumo_dados.py). O passo `notebooks` gera e executa, nesta ordem:
 analise_descritiva (gerar_analise), topicos_por_periodo (gerar_topicos), equilibrio_periodos (gerar_equilibrio),
-mudanca_por_tipo (gerar_tipos), categorias_por_periodo (gerar_categorias), incerteza (gerar_incerteza), robustez_mistura (gerar_robustez), afirmacoes (gerar_afirmacoes) e material_do_grupo (gerar_material).
+mudanca_por_tipo (gerar_tipos), categorias_por_periodo (gerar_categorias), incerteza (gerar_incerteza), robustez_mistura (gerar_robustez), afirmacoes (gerar_afirmacoes), validacao_campos (gerar_validacao) e material_do_grupo (gerar_material).
 Cada um roda em um subprocesso (PYTHONPATH=src, mesmo Python). Para no primeiro erro e diz como retomar
 (`--so PASSO` roda só aquele). Grava tudo em data/rodar_tudo.log.
 """
@@ -26,7 +26,7 @@ CADERNOS = [("gerar_analise.py", "analise_descritiva"), ("gerar_topicos.py", "to
             ("gerar_equilibrio.py", "equilibrio_periodos"), ("gerar_tipos.py", "mudanca_por_tipo"),
             ("gerar_categorias.py", "categorias_por_periodo"), ("gerar_incerteza.py", "incerteza"),
             ("gerar_robustez.py", "robustez_mistura"),
-            ("gerar_afirmacoes.py", "afirmacoes"),
+            ("gerar_afirmacoes.py", "afirmacoes"), ("gerar_validacao.py", "validacao_campos"),
             ("gerar_material.py", "material_do_grupo")]
 
 

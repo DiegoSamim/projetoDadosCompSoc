@@ -45,6 +45,8 @@ Nove afirmações fixadas antes de olhar os resultados. Cada uma compara o últi
 | 8 | O serviço doméstico ganha peso | tema (acompanha o tipo) | antes de 1831 | 28,0 → 42,8 | 35,5 → 42,8 | 14,8 [8,4; 21,4] / 7,3 [-2,8; 17,0] / -6,4 [-15,1; 3,6] | <0,001 | um degrau | **não sustentada** | O sinal da diferença muda ou some na visão ajustada. |
 | 9 | A ama de leite perde peso | tema (acompanha o tipo) | antes de 1831 | 17,4 → 11,2 | 22,4 → 11,2 | -6,1 [-11,1; -1,4] / -11,2 [-20,0; -2,7] / -3,2 [-8,2; 1,7] | <0,001 | gradual | **não sustentada** | Igualando a mistura de tipos, o intervalo da diferença contém zero: a tendência bruta do tema é, em boa parte, mistura de tipos. |
 
+**Ressalva de leitura (caderno `validacao_campos`).** Os campos são extraídos do texto por regras, e o código perde parte deles. Conferido à mão em 20 fugas por período: a **nação citada** e as **marcas no corpo** caem de fato; a **queda da recompensa** que o código mostra é **maior que a real** (o código perde mais recompensas nos períodos recentes), e a **alta da idade citada** vem em boa parte de o código achar poucas idades nos anúncios mais antigos. A afirmação 1 deve ser tratada como possível, não como medida; a 4, como frágil.
+
 ## Sinais principais
 
 **Fuga com recompensa, por período.** O anúncio oferece recompensa (gratificação, alviçaras)?
