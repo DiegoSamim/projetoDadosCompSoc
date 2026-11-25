@@ -27,7 +27,23 @@ Proporção média do tema nos anúncios de cada período.
 | T4 | Fuga: roupa levada e nação | nome, fugiu, dia, escravo, nacao | 31,4% | 14,7% | 11,9% | 15,4% |
 | T5 | Ama de leite | leite, ama, aluga, boa, preta | 17,4% | 14,4% | 13,0% | 11,2% |
 
-> **Ressalva:** os temas acompanham o tipo do anúncio (fuga, venda, aluguel, ama de leite): uma mudança de tema por período pode ser só mudança na mistura de tipos da amostra. Os nomes são sugestões, o grupo ainda os confirma.
+> **Ressalva:** os temas acompanham o tipo do anúncio (fuga, venda, aluguel, ama de leite): onde há mais anúncios de um tipo, o tema desse tipo pesa mais. Quando a mistura de tipos é igualada entre os períodos, os temas **não mostram mudança** (veja o caderno `robustez_mistura`); por isso esta tabela descreve a amostra e **não deve ser lida como uma tendência histórica**. Os nomes são sugestões, o grupo ainda os confirma.
+
+## Quadro de afirmações
+
+Nove afirmações fixadas antes de olhar os resultados. Cada uma compara o último período (1871–1888) com a base (o primeiro período com 30 anúncios ou mais), na visão bruta e só no Jornal do Commercio (e, nos temas, com a mistura de tipos igualada). **Sustentada** = a mudança é real em todas as visões; **parcial** = mesmo sentido, mas o intervalo inclui zero em alguma; **não sustentada** = o sentido muda ou contraria a frase; **frágil** = poucos anúncios. As afirmações 6 a 9 descrevem a amostra (mistura de tipos e temas), não achados históricos. Detalhes no caderno `afirmacoes`.
+
+| # | Afirmação | Natureza | Base | Valor base → último (bruta) | Valor base → último (só JC) | Diferença [IC 95%] (bruta / só JC / ajustada) | p aj. | Forma | Veredito | Motivo |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | A recompensa nas fugas diminui | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 55,9 → 22,6 | 60,2 → 22,6 | -33,3 [-47,8; -19,0] / -37,6 [-50,7; -25,6] | <0,001 | um degrau | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
+| 2 | A nação citada nas fugas diminui | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 52,9 → 2,2 | 45,4 → 2,2 | -50,8 [-63,2; -38,7] / -43,2 [-52,6; -34,1] | <0,001 | gradual | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
+| 3 | As marcas no corpo nas fugas diminuem | dentro do tipo | bruta: antes de 1831; só JC: 1831–1850 | 48,5 → 17,2 | 21,3 → 17,2 | -31,3 [-45,6; -16,8] / -4,1 [-15,0; 6,8] | <0,001 | um degrau | **parcial** | Mesmo sinal em todas as visões, mas o intervalo da diferença contém zero na visão só JC. |
+| 4 | A idade mediana dos fugidos aumenta | dentro do tipo | 1831–1850 | 21,5 → 30,0 | 21,5 → 30,0 | 8,5 [-0,2; 14,0] / 8,5 [-0,2; 14,0] anos | 0,007 | um degrau | **frágil** | Na visão bruta o último período tem menos de 30 anúncios (n ou n efetivo). |
+| 5 | A parcela feminina dos aluguéis aumenta | dentro do tipo | 1831–1850 | 55,8 → 68,9 | 55,6 → 68,9 | 13,1 [2,8; 23,3] / 13,4 [2,4; 23,8] | 0,016 | gradual | **sustentada** | Tendência bruta com p ajustado < 0,05 e diferença com intervalo sem zero, no mesmo sentido, em todas as visões. |
+| 6 | A fuga perde peso entre os anúncios | mistura da amostra | antes de 1831 | 44,7 → 23,9 | 28,8 → 23,9 | -20,8 [-29,9; -11,8] / -4,9 [-17,5; 7,6] | <0,001 | um degrau | **parcial** | Mesmo sinal em todas as visões, mas o intervalo da diferença contém zero na visão só JC. |
+| 7 | Os temas de fuga perdem peso | tema (acompanha o tipo) | antes de 1831 | 46,3 → 25,2 | 31,7 → 25,2 | -21,1 [-28,9; -13,5] / -6,5 [-17,3; 4,4] / -2,6 [-10,3; 3,8] | 0,877 | um degrau | **não sustentada** | Igualando a mistura de tipos, o intervalo da diferença contém zero: a tendência bruta do tema é, em boa parte, mistura de tipos. |
+| 8 | O serviço doméstico ganha peso | tema (acompanha o tipo) | antes de 1831 | 28,0 → 42,8 | 35,5 → 42,8 | 14,8 [8,4; 21,4] / 7,3 [-2,8; 17,0] / -6,4 [-15,1; 3,6] | <0,001 | um degrau | **não sustentada** | O sinal da diferença muda ou some na visão ajustada. |
+| 9 | A ama de leite perde peso | tema (acompanha o tipo) | antes de 1831 | 17,4 → 11,2 | 22,4 → 11,2 | -6,1 [-11,1; -1,4] / -11,2 [-20,0; -2,7] / -3,2 [-8,2; 1,7] | <0,001 | gradual | **não sustentada** | Igualando a mistura de tipos, o intervalo da diferença contém zero: a tendência bruta do tema é, em boa parte, mistura de tipos. |
 
 ## Sinais principais
 

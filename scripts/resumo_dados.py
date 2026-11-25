@@ -14,7 +14,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))
 
-from hdb import config
+from hdb import afirmacoes, config, medidas
 from hdb.relatorio import num, tabela
 
 SAIDA = RAIZ / "resumo_dados.md"
@@ -75,10 +75,12 @@ def ler(banco):
     for p in _todas(cli.table("paginas").select("id,bib,ano").eq("status", "ok").order("id")):
         if p.get("ano"):
             paginas[(nomes.get(p["bib"]) or p["bib"], p["ano"])] += 1
+    quadro = afirmacoes.quadro(medidas.calcular(medidas.carregar(banco, config)))   # ~30 s: bootstrap das 9 medidas
     return {
         "gerado_em": datetime.now().strftime("%Y-%m-%d"),
         "versoes": {"campos": config.VERSAO_CAMPOS, "corpus": config.VERSAO_CORPUS, "topicos": config.VERSAO_TOPICOS},
         "anuncios": anuncios,
+        "quadro": quadro,
         "topicos": {"palavras": dict(palavras), "mistura": dict(mistura)},
         "paginas_por_ano": [{"acervo": a, "ano": y, "n": n} for (a, y), n in sorted(paginas.items())],
     }
@@ -134,8 +136,21 @@ def _temas(dados):
         linhas.append((f"T{t}", nomes[t], ", ".join(palavras.get(t, palavras.get(str(t), []))[:5]), *celulas))
     cab = ("Tema", "Nome sugerido", "Palavras principais", *[f"{p} (n = {num(len(por_periodo[p]))})" for p in periodos])
     return (tabela(cab, linhas) + "\n\n> **Ressalva:** os temas acompanham o tipo do anúncio (fuga, venda, aluguel, ama de leite): "
-            "uma mudança de tema por período pode ser só mudança na mistura de tipos da amostra. Os nomes são sugestões, "
-            "o grupo ainda os confirma.")
+            "onde há mais anúncios de um tipo, o tema desse tipo pesa mais. Quando a mistura de tipos é igualada entre os períodos, "
+            "os temas **não mostram mudança** (veja o caderno `robustez_mistura`); por isso esta tabela descreve a amostra e "
+            "**não deve ser lida como uma tendência histórica**. Os nomes são sugestões, o grupo ainda os confirma.")
+
+
+def _quadro(dados):
+    q = dados.get("quadro")
+    if not q:
+        return SEM_DADOS
+    return ("Nove afirmações fixadas antes de olhar os resultados. Cada uma compara o último período (1871–1888) com a base "
+            "(o primeiro período com 30 anúncios ou mais), na visão bruta e só no Jornal do Commercio (e, nos temas, com a "
+            "mistura de tipos igualada). **Sustentada** = a mudança é real em todas as visões; **parcial** = mesmo sentido, mas "
+            "o intervalo inclui zero em alguma; **não sustentada** = o sentido muda ou contraria a frase; **frágil** = poucos "
+            "anúncios. As afirmações 6 a 9 descrevem a amostra (mistura de tipos e temas), não achados históricos. "
+            "Detalhes no caderno `afirmacoes`.\n\n" + afirmacoes.formatar(q))
 
 
 def _sinais(anuncios):
@@ -229,6 +244,7 @@ def montar(dados):
         f"{num(sum(1 for a in anuncios if a.get('c_tipo') not in (None, 'outro')))} são anúncios de pessoas "
         f"(os demais, tipo `outro`, são casas, notícias, mercadorias etc.).\n\n" + (_por_periodo_e_tipo(anuncios) if anuncios else SEM_DADOS),
         "## Os temas e o peso de cada um por período\n\nProporção média do tema nos anúncios de cada período.\n\n" + _temas(dados),
+        "## Quadro de afirmações\n\n" + _quadro(dados),
         "## Sinais principais\n\n" + _sinais(anuncios),
         "## Cobertura: onde temos páginas\n\n" + _cobertura(dados.get("paginas_por_ano") or []),
         "## Os 3 limites principais\n\n" + "\n".join(f"{i}. {t}" for i, t in enumerate(LIMITES, 1)),
