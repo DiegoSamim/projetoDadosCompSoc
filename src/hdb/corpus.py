@@ -53,7 +53,7 @@ LETRAS = re.compile(r"[a-z]+")
 
 MOTIVOS = {
     "tipo": "tipo 'outro' ou sem tipo", "incerto": "aluguel sem marca de escravizado", "confianca": "confiança do OCR baixa ou ausente",
-    "curto": "poucas palavras (pedaço de anúncio)", "sem_pessoa": "fuga sem pessoa nem marca de escravizado (objeto, animal)",
+    "curto": "poucas palavras (pedaço de anúncio)", "longo": "texto longo demais (anúncios colados)", "sem_pessoa": "fuga sem pessoa nem marca de escravizado (objeto, animal)",
 }
 
 
@@ -85,7 +85,7 @@ def _tem_pessoa(texto):
 
 
 def motivo_descarte(anuncio, incluir_incertos=False):
-    """Por que o anúncio fica de fora do corpus ('tipo', 'incerto', 'confianca', 'curto', 'sem_pessoa'); None se entra.
+    """Por que o anúncio fica de fora do corpus ('tipo', 'incerto', 'confianca', 'curto', 'longo', 'sem_pessoa'); None se entra.
 
     Com `incluir_incertos`, o 'aluguel_incerto' não é descartado por ser incerto (variante do corpus).
     """
@@ -98,6 +98,8 @@ def motivo_descarte(anuncio, incluir_incertos=False):
         return "confianca"
     if contar_palavras(anuncio.get("texto")) < config.CORPUS_PALAVRAS_MIN:
         return "curto"
+    if len(anuncio.get("texto") or "") > config.CORPUS_CARACTERES_MAX:
+        return "longo"
     if anuncio.get("c_tipo") == "fuga" and not _tem_pessoa(cortar_colado(anuncio.get("texto"))):
         return "sem_pessoa"
     return None

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 ARQUIVO = Path(__file__).resolve().parents[1] / "scripts" / "rodar_tudo.py"
-ORDEM = ["campos", "corpus", "corpus_i", "topicos", "topicos_i", "estabilidade", "relatorio", "notebooks"]
+ORDEM = ["campos", "corpus", "corpus_i", "topicos", "topicos_i", "estabilidade", "relatorio", "resumo", "notebooks"]
 
 
 @pytest.fixture
@@ -47,7 +47,8 @@ def test_ordem_e_flags(rt):
 def test_roda_todos_na_ordem_com_pythonpath_e_log(rt, monkeypatch):
     chamados = simular(monkeypatch, rt)
     assert rt.main(["--sem-notebooks", "--rapido"]) == 0
-    assert [c[3] for c in chamados] == ["campos", "corpus", "corpus", "topicos", "topicos", "relatorio"]
+    assert [c[3] if c[1] == "-m" else Path(c[1]).name for c in chamados] == [
+        "campos", "corpus", "corpus", "topicos", "topicos", "relatorio", "resumo_dados.py"]
     assert "--incluir-incertos" in chamados[2] and "corp3i" in chamados[2] and "t5i" in chamados[4]
     log = rt.LOG.read_text(encoding="utf-8")
     assert "[campos] ok" in log and "Tudo pronto" in log
@@ -65,10 +66,18 @@ def test_so_roda_um_passo(rt, monkeypatch):
     chamados = simular(monkeypatch, rt)
     assert rt.main(["--so", "relatorio"]) == 0
     assert len(chamados) == 1 and chamados[0][-1] == "relatorio"
+    chamados.clear()
+    assert rt.main(["--so", "resumo"]) == 0
+    assert [Path(c[1]).name for c in chamados] == ["resumo_dados.py"]
 
 
-def test_notebooks_geram_e_executam(rt, monkeypatch):
+def test_notebooks_geram_e_executam_na_ordem(rt, monkeypatch):
     chamados = simular(monkeypatch, rt)
     rt.main(["--so", "notebooks"])
-    assert [Path(c[1]).name for c in chamados] == ["gerar_analise.py", "gerar_topicos.py",
-                                                    "executar_notebook.py", "executar_notebook.py"]
+    esperado = [("gerar_analise.py", None), ("executar_notebook.py", "analise_descritiva"),
+                ("gerar_topicos.py", None), ("executar_notebook.py", "topicos_por_periodo"),
+                ("gerar_equilibrio.py", None), ("executar_notebook.py", "equilibrio_periodos"),
+                ("gerar_tipos.py", None), ("executar_notebook.py", "mudanca_por_tipo"),
+                ("gerar_categorias.py", None), ("executar_notebook.py", "categorias_por_periodo"),
+                ("gerar_material.py", None), ("executar_notebook.py", "material_do_grupo")]
+    assert [(Path(c[1]).name, Path(c[2]).stem if len(c) > 2 else None) for c in chamados] == esperado

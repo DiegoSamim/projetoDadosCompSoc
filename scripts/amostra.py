@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from hdb import config  # noqa: E402
 from hdb.banco import BancoSupabase  # noqa: E402
-from hdb.busca import coletar_ocorrencias, nova_sessao  # noqa: E402
+from hdb.busca import SiteIndisponivel, coletar_ocorrencias, nova_sessao  # noqa: E402
 
 LISTAR_NO_MAXIMO = 200  # ocorrências listadas por célula (a lista sai em ordem de data)
 LISTAR_EXTRAS = 60      # nas células extras, menos: só precisamos de poucas páginas
@@ -158,7 +158,13 @@ def listar(banco, pessoa=None, extras=False, complemento=False, cobertura=False)
     limite = (LISTAR_COBERTURA if cobertura else LISTAR_COMPLEMENTO if complemento
               else LISTAR_EXTRAS if extras else LISTAR_NO_MAXIMO)
     for periodo, tipo, bib, acervo, termo, _ in celulas(pessoa, extras, complemento, cobertura):
-        salvas, total = coletar_ocorrencias(sessao, bib, termo, banco, limite=limite)
+        try:
+            salvas, total = coletar_ocorrencias(sessao, bib, termo, banco, limite=limite)
+        except SiteIndisponivel as e:
+            salvas = banco.contar_ocorrencias(bib, termo)
+            print(f"\n{e}. Parou em {acervo} · {termo}: {salvas} ocorrências salvas; o que já foi gravado "
+                  f"fica. Tente de novo mais tarde (a listagem continua de onde parou).")
+            raise SystemExit(2)
         print(f"{periodo:14} {tipo:13} {acervo:11} {termo:24} {salvas} listadas de {total}", flush=True)
 
 
@@ -172,8 +178,12 @@ def capturar(banco, quem, modo, pessoa=None, extras=False, complemento=False, co
             continue
         print(f"\n== {periodo} · {tipo} · {acervo} · {termo}: faltam {falta} páginas", flush=True)
         # as imagens ficam em data/amostra porque `hdb anuncios` ainda precisa delas (planejamento, 3.1)
-        capturar_paginas(banco, quem, bib=bib, termo=termo, max_paginas=falta, aleatorio=True, modo=modo,
-                         guardar=config.AMOSTRA_DIR, equilibrar=cobertura or complemento)
+        bloqueado = capturar_paginas(banco, quem, bib=bib, termo=termo, max_paginas=falta, aleatorio=True,
+                                     modo=modo, guardar=config.AMOSTRA_DIR, equilibrar=cobertura or complemento)
+        if bloqueado:
+            print("\nO site da BN está pedindo para esperar; as páginas voltaram para a fila. "
+                  "Tente de novo mais tarde.")
+            raise SystemExit(2)
 
 
 def main():

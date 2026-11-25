@@ -20,8 +20,9 @@ Situação em 25/11/2026. Este plano cobre só os **dados**: coleta, correções
 | Complemento | 69 de 91 páginas |
 | Anos 1887 e 1888 | **nenhuma página** |
 | Ano de 1886 | só 13 anúncios |
-| Páginas de 1827–1839 sem anúncios separados | 33 |
-| Site da Biblioteca Nacional | bloqueou nossos pedidos em 24/11 por excesso de acessos |
+| Páginas de 1827–1839 sem anúncios separados | 0 (separadas só pelo texto, `v2t`; 1.6) |
+| Páginas do JC dos anos 1860 sem anúncios separados | 16 (esperam as imagens da outra máquina) |
+| Site da Biblioteca Nacional | bloqueou nossos pedidos em 24/11 por excesso de acessos; desde 25/11 a ferramenta espera e para sem marcar erro (1.1) |
 
 ## Ordem geral
 
@@ -39,11 +40,12 @@ As etapas 1 e 2 podem andar juntas: enquanto se espera o site liberar, dá para 
 
 ## Etapa 1. Coleta: juntar o que falta
 
-### 1.1 Ensinar a ferramenta a respeitar o site (Claude)
+### 1.1 Ensinar a ferramenta a respeitar o site (Claude) — FEITO em 25/11
 Hoje, quando o site manda esperar, a ferramenta insiste, e cada página que falha gasta uma das 3 tentativas.
 - A ferramenta passa a esperar sozinha quando o site pede pausa, aumenta o intervalo nas listagens longas e, se o bloqueio continuar, para com uma mensagem clara em vez de queimar tentativas.
 - **Pronto quando:** os testes passam e uma simulação de bloqueio mostra a ferramenta parando sem marcar as páginas como erro.
 - **Tempo:** ~1 h. Não depende do site.
+- **Feito:** a espera segue o `Retry-After` do site (ou uma espera que dobra a cada bloqueio, com teto de 15 minutos). Depois de 3 respostas de bloqueio seguidas, a ferramenta para com a mensagem "tente de novo mais tarde" e código de saída 2. Na captura, a página que volta para a fila não ganha erro nem perde tentativa. Nas listagens longas, a pausa passa de 1,5 para 3 segundos depois de 200 passos. Há testes automáticos para a espera, a parada e a captura que não marca erro.
 
 ### 1.2 Ver se o site liberou (Diego)
 - Abrir no navegador: https://memoria.bn.gov.br/docreader/docreader.aspx?bib=364568_07&Pesq=%22escravo%20fugido%22
@@ -77,11 +79,12 @@ Faltam 22 páginas, nesta ordem de prioridade:
 - Os itens 4 e 5: Claude faz **um único** pedido de teste em cada. Se falharem, saem do plano e isso entra no relatório como limite.
 - **Pronto quando:** os itens 1 a 3 estão capturados, e os itens 4 e 5 estão capturados ou anotados como impossíveis.
 
-### 1.6 Separar os anúncios das 33 páginas de 1827–1839 (outra máquina)
+### 1.6 Separar os anúncios das 33 páginas de 1827–1839 (outra máquina) — FEITO em 25/11, pelo texto, nos acervos 01 e 02
 Essas páginas foram capturadas em outra máquina e o texto está no banco, mas os anúncios não foram separados.
 - Na outra máquina: atualizar o código e enviar as palavras lidas (comandos no fim deste documento).
-- Se ela não tiver mais os arquivos, Claude avalia separar a partir do texto já guardado, com um resultado um pouco pior.
-- **Pronto quando:** os jornais 364568_01 e 364568_02 aparecem com anúncios na contagem por jornal.
+- **Feito:** Claude separou as páginas a partir do texto já guardado no banco, com um resultado um pouco pior (versão `v2t`, comando `hdb anuncios --do-texto --bib 364568_01 364568_02`). Foi aplicado só aos acervos 364568_01 e 364568_02, que têm poucas colunas e anúncios numerados.
+- **Não entrou:** o JC dos anos 1860 (364568_05, várias colunas). Pelo texto, o programa mistura as colunas nele. Essas 16 páginas continuam esperando as imagens da outra máquina (comandos no fim deste documento).
+- **Pronto quando:** os jornais 364568_01 e 364568_02 aparecem com anúncios na contagem por jornal. Atendido para 01 e 02; o 05 segue pendente.
 
 ---
 
@@ -160,18 +163,35 @@ O programa que lê a imagem troca letras ("ende" em vez de "vende", "annos" em v
 
 ---
 
+## Auditoria dos anúncios típicos (25/11)
+
+Para testar as regras onde elas mais pesam, Claude leu os anúncios mais típicos de cada tópico e rotulou cada um como certo ou com problema. Foram duas rodadas:
+
+| Rodada | O que mostrou |
+|---|---|
+| 1ª | Serviu para ajustar as regras (as correções da Etapa 2). |
+| 2ª | Anúncios que as regras ainda não tinham visto. Ainda há problemas de tipos variados, a chamada cauda longa: casos raros que escapam das regras. |
+
+- **Meta:** no máximo 2 problemas em 30 anúncios. **Não foi atingida.** A limpeza melhorou, mas os temas ainda podem ter ruído.
+- **O que isso significa:** a cauda longa deve aparecer como limite na análise e na apresentação. Novas correções devem vir do que a leitura de casos novos mostrar, para não ajustar as regras só aos casos já vistos.
+- Os rótulos são de Claude, não do grupo. O grupo pode repetir a conferência com os arquivos da Etapa 2.3.
+
+---
+
 ## Etapa 3. Melhorias: deixar a comparação justa
 
-### 3.1 Equilibrar os períodos (Claude, decisão do Diego)
+### 3.1 Equilibrar os períodos (Claude, decisão do Diego) — FEITO de forma automática em 25/11
 Hoje há 102 anúncios antes de 1831, 460 em 1831–1850, 1.132 em 1850–1871 e 400 em 1871–1888. O período maior "puxa" os temas.
 - Opção A: rodar os temas com um **sorteio do mesmo número** de anúncios por período (~400 cada).
 - Opção B: manter todos, mas mostrar sempre as porcentagens dentro de cada período (é o que fazemos hoje).
 - **Recomendação:** fazer as duas e mostrar que os temas principais aparecem nas duas.
+- **Feito:** o caderno `equilibrio_periodos.ipynb` faz a opção A, com sorteio do mesmo número de anúncios por período, repetido e com a média. A opção B continua nos cadernos de tópicos. **Falta:** a leitura do grupo sobre se os temas principais aparecem nas duas.
 
-### 3.2 Separar o efeito do tipo de anúncio (Claude)
+### 3.2 Separar o efeito do tipo de anúncio (Claude) — FEITO de forma automática em 25/11
 Os temas seguem muito o tipo (fuga, venda, aluguel). A busca achou proporções diferentes de cada tipo em cada período: a fuga em 1871–1888 subiu só porque capturamos mais fugas dos anos 1880.
 - Mostrar a mudança dos temas **dentro de cada tipo**, por exemplo como mudam os anúncios de fuga entre os períodos.
 - **Pronto quando:** o caderno de temas tem um gráfico por tipo.
+- **Feito:** o caderno `mudanca_por_tipo.ipynb` mostra, dentro de cada tipo, as palavras distintivas e os atributos por período.
 
 ### 3.3 Subperíodo 1885–1888 (Claude, depende da 1.4)
 Os Sexagenários (1885) e a Lei Áurea (1888) caem no mesmo período, 1871–1888.
@@ -191,7 +211,7 @@ Os nomes atuais são sugestões do Claude. Para cada tema:
 2. escolher um nome curto e escrever uma frase do porquê.
 - Fazer **depois** da Etapa 2, porque a limpeza muda os temas.
 
-### 4.2 Categorias novas a partir do texto (Claude propõe, grupo escolhe)
+### 4.2 Categorias novas a partir do texto (Claude propõe, grupo escolhe) — FEITO de forma automática em 25/11, com a escolha ainda com o grupo
 Coisas que os anúncios dizem e que podemos contar por período:
 
 | Categoria | Exemplo no texto | Para que serve |
@@ -203,6 +223,7 @@ Coisas que os anúncios dizem e que podemos contar por período:
 | **Cor** | preto, pardo, crioulo, cabra | mudança no vocabulário |
 
 - O grupo escolhe **2 ou 3** dessas categorias. Claude monta as listas de palavras e conta.
+- **Feito:** o caderno `categorias_por_periodo.ipynb` cobre qualidades, defeitos, marcas no corpo, ofício e cor (módulo `src/hdb/categorias.py`). A categoria Lugar ficou de fora desta rodada. **Falta:** o grupo escolher as 2 ou 3 que vai destacar.
 - **Pronto quando:** as categorias escolhidas estão no caderno descritivo, com gráfico por período.
 
 ### 4.3 Recortes por sexo, idade e nação (Claude)
@@ -252,7 +273,7 @@ PYTHONPATH=src .venv/bin/python scripts/amostra.py situacao --cobertura
 PYTHONPATH=src .venv/bin/python scripts/amostra.py situacao --complemento
 ```
 
-Capturar (só depois da 1.1 e da 1.2):
+Capturar (só depois da 1.2):
 
 ```bash
 git pull
@@ -260,7 +281,7 @@ PYTHONPATH=src .venv/bin/python scripts/amostra.py capturar --cobertura
 PYTHONPATH=src .venv/bin/python scripts/amostra.py capturar --complemento
 ```
 
-Na outra máquina (1.6):
+Na outra máquina (só para as 16 páginas do JC dos anos 1860, 1.6):
 
 ```bash
 git pull

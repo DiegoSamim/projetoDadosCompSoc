@@ -11,6 +11,12 @@ USER_AGENT = (
 PAUSA = 1.5
 TIMEOUT = 60
 TENTATIVAS = 4  # tentativas por requisição, com espera crescente (2 s, 4 s, 8 s...)
+# Bloqueio do site (HTTP 429/503): espera o `Retry-After`; sem ele, ESPERA_BLOQUEIO dobrando até o máximo.
+ESPERA_BLOQUEIO = 60  # segundos da 1ª espera depois de um 429/503 sem `Retry-After`
+ESPERA_BLOQUEIO_MAX = 900  # teto da espera, em segundos
+TENTATIVAS_BLOQUEIO = 3  # respostas 429/503 seguidas antes de desistir (SiteIndisponivel)
+LISTAGEM_PASSOS_PAUSA_LONGA = 200  # passos numa mesma listagem a partir dos quais a pausa aumenta
+PAUSA_LISTAGEM_LONGA = 3  # segundos entre requisições numa listagem longa (pausa fixa)
 
 RAIZ = Path(__file__).resolve().parents[2]
 DATA_DIR = RAIZ / "data"
@@ -91,6 +97,7 @@ VERSAO_CORPUS = "corp3"  # versão do texto padronizado (hdb.corpus); muda quand
 LOTE_CORPUS = 500  # linhas do corpus gravadas por chamada ao banco
 CORPUS_CONFIANCA_MIN = 50  # confiança mínima do OCR para o anúncio entrar no corpus
 CORPUS_PALAVRAS_MIN = 8  # anúncios com menos palavras são pedaços, não anúncios inteiros
+CORPUS_CARACTERES_MAX = 1500  # acima disto é quase sempre mais de um anúncio colado (p99 do corpus: 1.121; só 8 passam)
 VERSAO_TOPICOS = "t5"  # versão do modelo de tópicos (hdb.topicos); regravar a mesma substitui
 N_TOPICOS = 8  # número de tópicos do LDA
 SEMENTE_TOPICOS = 0  # semente do LDA (resultado reproduzível)
@@ -99,6 +106,7 @@ TOPICOS_MAX_DF = 0.5  # ... e em no máximo esta fração deles
 TOPICOS_PALAVRAS = 12  # palavras mostradas e gravadas por tópico
 TOPICOS_TIPICOS = 5  # anúncios típicos por tópico
 VERSAO_ANUNCIOS = "v2"  # versão da segmentação em anúncios; muda quando as heurísticas mudam
+VERSOES_ANUNCIOS = (VERSAO_ANUNCIOS, "v2t")  # v2t: anúncios segmentados só pelo texto do OCR (hdb anuncios --do-texto); cadernos e resumo leem as duas
 DEPURACAO_LARGURA = 900  # px de largura dos PNGs de depuração
 
 # Panorama de acervos (hdb.acervos): lista de periódicos da tela de busca e contagem por termo

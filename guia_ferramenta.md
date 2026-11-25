@@ -68,6 +68,7 @@ Quais termos usar e quantas páginas cada um tem está em [termos_busca.md](term
 - Se a captura cair, as páginas reservadas voltam para a fila (na hora, ou em 30 minutos se o programa for fechado à força).
 - Falhas de captura voltam para a fila até 3 vezes. Falhas de OCR não voltam, porque capturar de novo daria o mesmo resultado; a imagem fica guardada para estudo.
 - Consultas ao banco que dão timeout, erro 5xx ou 429 (muitos pedidos seguidos) são repetidas até 3 vezes, sozinhas.
+- **Bloqueio do site (429 ou 503).** Quando a Biblioteca Nacional pede espera, a ferramenta espera o tempo indicado pelo site (`Retry-After`); sem essa indicação, espera 1 minuto, dobrando a cada novo bloqueio até o máximo de 15 minutos. Depois de 3 respostas de bloqueio seguidas, para e avisa "tente de novo mais tarde". Nada disso é marcado como erro de página, e o que já foi feito continua valendo.
 
 ## O que precisa estar pronto
 
@@ -155,6 +156,7 @@ $PY -m hdb buscar --bib 364568_04 --termo '"escrav* fugid*"' --limite 100
 - **O que acontece:** a ferramenta abre a busca na HDB e anda de página em página, gravando cada uma como `pendente`. Não pede CAPTCHA. Leva cerca de 3,6 segundos por página.
 - **Resultado:** `100 de 671 ocorrências de '"escrav* fugid*"' no banco.`
 - Se cair no meio, rode o mesmo comando de novo: ele continua de onde parou.
+- Se o site bloquear de vez, o comando espera e, persistindo o bloqueio, para com a mensagem "tente de novo mais tarde" e código de saída `2`. O que já foi gravado fica; é só rodar de novo depois.
 
 ### 3. Capturar, ler e separar: `capturar`
 
@@ -188,6 +190,8 @@ Resumo: 28 ok, 2 erros, 1 CAPTCHAs resolvidos (páginas por CAPTCHA: 28.0).
 
 **Para parar, use Ctrl+C.** O que já foi gravado fica, e o resto volta para a fila.
 
+**Se o site bloquear (429 ou 503) durante a captura:** quando a imagem não aparece e o site responde com bloqueio, a página **não é marcada como erro e não gasta tentativa**. Ela volta para a fila, e a captura para com a mensagem "tente de novo mais tarde" e código de saída `2`. Nada é resolvido sozinho: o CAPTCHA continua sendo digitado por uma pessoa.
+
 Cada página leva em média uns 40 segundos, quase tudo de OCR. Páginas de jornais mais densos (anos 1880) levam mais.
 
 ### 4. Separar os anúncios: `anuncios`
@@ -204,6 +208,11 @@ $PY -m hdb anuncios --pasta data/amostra --depurar data/depuracao/paginas
 - **Resultado por página:** `364568_03 p.44: 4 colunas, 622 segmentos, 66 anúncios, 24 com abertura, 14 com título`.
 - `--depurar DIR` cria uma imagem por página com as colunas (linhas vermelhas) e cada anúncio num retângulo numerado. É a melhor forma de conferir se a separação funcionou.
 - `--versao` (padrão `v2`) dá nome à versão da regra. Rodar de novo a mesma versão substitui os anúncios dela; uma versão nova convive com as antigas, o que permite comparar.
+- **`--do-texto` (segmentação só pelo texto, versão `v2t`):** segmenta, sem imagem e sem posições das palavras, as páginas que têm o texto do OCR no banco e ainda não têm anúncios `v2`. Grava o resultado como `v2t`, ao lado da `v2`. Com `--bib`, limita aos acervos indicados: `$PY -m hdb anuncios --do-texto --bib 364568_01 364568_02`.
+- **Quando vale:** páginas de poucas colunas e anúncios numerados, como o Diário do Rio e o Jornal do Commercio dos anos 1820 e 1830. Por isso foi aplicada só aos acervos `364568_01` e `364568_02`.
+- **Quando não vale:** jornais de várias colunas, como o JC dos anos 1860. O Tesseract emenda linhas de colunas vizinhas e a separação fica bem pior. Essas páginas esperam a imagem, para a separação com posições.
+- `scripts/validar_texto.py` compara a `v2t` com a `v2` das mesmas páginas, só lendo o banco. A meta de 70% de concordância vale só para o Diário do Rio.
+- `hdb campos`, o resumo e os cadernos leem as duas versões (`v2` e `v2t`).
 
 ### 5. Ver o andamento: `status`
 
@@ -274,7 +283,7 @@ $PY -m hdb corpus --incluir-incertos
 - **Cortes feitos no `corp3`:**
   - `cortar_colado`: quando o OCR colou dois anúncios num pedaço só, fica com o primeiro trecho que tem pessoa. O texto original nunca é alterado.
   - `descobrir_ocr` (em `src/hdb/corpus.py`): acha e aplica os erros de OCR de "perda da primeira letra" (`luga`→`aluga`, `ozinha`→`cozinha`). Os demais candidatos só são listados, para revisão.
-- A saída diz quantos anúncios entraram no corpus e quantos foram descartados, com o motivo: tipo `outro`, aluguel sem marca de escravizado, fuga sem sinal de pessoa (`sem_pessoa`), OCR com confiança baixa ou ausente, e poucas palavras. Depois, a contagem por período legal.
+- A saída diz quantos anúncios entraram no corpus e quantos foram descartados, com o motivo: tipo `outro`, aluguel sem marca de escravizado, fuga sem sinal de pessoa (`sem_pessoa`), OCR com confiança baixa ou ausente, poucas palavras e texto longo demais (`longo`: mais de 1.500 caracteres, em geral vários anúncios colados). Depois, a contagem por período legal.
 - Um anúncio `sem_pessoa` fica fora do modelo de tópicos, mas continua no banco e nos gráficos descritivos.
 
 ### 10. Modelar os tópicos: `topicos`
@@ -284,11 +293,14 @@ $PY -m hdb topicos --topicos 6 --versao t5
 ```
 
 - Roda o LDA sobre o corpus e grava as palavras de cada tópico (`topico_palavras`), a mistura de tópicos de cada anúncio (`anuncio_topicos`) e o registro do modelo (`topico_modelos`), com o nome da versão.
-- `--topicos` (padrão 8), `--versao` (padrão `t2`) e `--semente` (padrão 0, para o resultado se repetir). As versões atuais:
+- `--topicos` (padrão 8), `--versao` (padrão `t2`) e `--semente` (padrão 0, para o resultado se repetir). Com `--semente auto`, o programa roda 10 sementes e usa a mais representativa, ou seja, a que mais se parece com as demais. As versões atuais:
   - **`t5`**: 6 tópicos, sobre o corpus `corp3`. É a principal.
   - **`t5i`**: 6 tópicos, sobre o corpus `corp3i` (com os `aluguel_incerto`). Mede a sensibilidade da análise a esses anúncios.
   - **`t4`**: corpus antigo (`corp2`). Fica para comparação.
 - A saída tem uma linha com o número de anúncios e a perplexidade. Depois, para cada tópico: quantos anúncios o têm como dominante, as palavras mais fortes e a divisão por período legal e por tipo.
+- **Nomes sugeridos:** `hdb.topicos.nomear` dá a cada tópico um nome a partir das suas palavras. É só uma sugestão; quem decide é o grupo.
+- **Palavras distintivas** (`src/hdb/distintivas.py`): as palavras que mais distinguem um grupo dos outros (um período, um tipo, um sexo), com um teste estatístico que evita palavras comuns demais. O caderno de mudança por tipo as usa.
+- **Períodos de mesmo tamanho** (`topicos.equilibrado`): repete o LDA em sorteios com o mesmo número de anúncios por período e tira a média. O caderno `equilibrio_periodos.ipynb` usa essa função.
 - O número de tópicos muda os temas: veja os Cuidados em [linguagem_natural.md](linguagem_natural.md). A estabilidade é medida com `scripts/estabilidade_topicos.py`. A comparação dos períodos está nos notebooks [topicos_por_periodo.ipynb](notebooks/topicos_por_periodo.ipynb) e [analise_descritiva.ipynb](notebooks/analise_descritiva.ipynb).
 
 ### 11. Gerar o relatório: `relatorio`
@@ -379,13 +391,14 @@ PYTHONPATH=src $PY scripts/rodar_tudo.py --so topicos
 
 | Opção | O que faz |
 |---|---|
-| `--rapido` | roda a versão mais curta do fluxo (`--help` mostra a lista completa de opções) |
+| `--rapido` | pula a estabilidade dos tópicos, que é a parte mais demorada (`--help` mostra a lista completa de opções) |
 | `--sem-notebooks` | não refaz os cadernos (o último passo) |
 | `--so PASSO` | roda só um passo |
 
-- Os passos, nesta ordem: `campos`, `corpus`, `corpus_i`, `topicos`, `topicos_i`, `estabilidade`, `relatorio`, `notebooks`.
+- Os passos, nesta ordem: `campos`, `corpus`, `corpus_i`, `topicos`, `topicos_i`, `estabilidade`, `relatorio`, `resumo`, `notebooks`.
+- `resumo` grava o `resumo_dados.md` (uma página, com os números lidos do banco e o mapa de cobertura por ano). `notebooks` gera e executa seis cadernos: análise descritiva, tópicos por período, equilíbrio entre períodos, mudança por tipo, categorias por período e material do grupo.
 - O comando **para no primeiro erro**. O registro de cada execução fica em `data/rodar_tudo.log`.
-- Os geradores dos cadernos ficam em `scripts/notebooks/`. Os comentários com números são reescritos à mão depois de cada rodada.
+- Os geradores dos cadernos ficam em `scripts/notebooks/`. Os comentários com números são reescritos à mão depois de cada rodada. Cada caderno avisa quando o número de anúncios mudou desde que os comentários foram escritos.
 
 ## Outros comandos
 
@@ -399,6 +412,8 @@ PYTHONPATH=src $PY scripts/rodar_tudo.py --so topicos
 | `scripts/estabilidade_topicos.py` | mede a estabilidade do LDA por número de tópicos (k) e semente. Use antes de escolher o k. |
 | `scripts/contar_termos.py` | conta em quantas páginas cada termo aparece em cada acervo. Para testar termos novos, acrescente-os à lista do arquivo e rode: ele conta só o que falta. |
 | `scripts/contar_paginas.py` | conta o total de páginas de cada acervo. |
+| `scripts/resumo_dados.py` | grava `resumo_dados.md`: uma página com os números finais, lidos do banco, e o mapa de cobertura (anos sem página). É o passo `resumo` do `rodar_tudo.py`. |
+| `scripts/validar_texto.py` | compara a segmentação pelo texto (`v2t`) com a segmentação com posições (`v2`), só lendo o banco. Veja `anuncios --do-texto`. |
 
 Testes automáticos (não usam internet nem banco): `$PY -m pytest`.
 
@@ -452,6 +467,7 @@ Quatro "views" (consultas prontas, que se usam como tabelas): `panorama` (o rank
 | A captura parou no meio | rode o mesmo comando: as páginas voltaram para a fila e as imagens que sobraram em `data/tmp/` são lidas primeiro |
 | Página com status `erro` de OCR | a imagem está em `data/falhas_ocr/`; teste com `reprocessar --pasta data/falhas_ocr` |
 | A captura está lenta | é o OCR; páginas densas levam mais de um minuto |
+| Mensagem "tente de novo mais tarde" e código de saída 2 | o site da HDB bloqueou os pedidos. Espere um tempo e rode o mesmo comando de novo; nada foi perdido e as páginas não foram marcadas como erro |
 | O `anuncios` não acha imagem nem palavras de uma página | se houver `data/ocr_palavras/` na máquina, rode `palavras --subir`; senão, a imagem precisa estar em disco (`data/amostra/`) |
 | O computador ficou sem espaço | as imagens de `data/amostra/` ocupam ~3,5 MB cada. Podem ser apagadas as de páginas que já têm palavras no banco (`anuncios` e `campos` não dependem mais delas). Não apague as das páginas ainda sem separação (planejamento, A1) |
 
@@ -462,7 +478,7 @@ Quatro "views" (consultas prontas, que se usam como tabelas): `panorama` (o rank
 - **A separação de anúncios é heurística:** pode juntar dois anúncios vizinhos ou partir um em dois. As imagens de depuração mostram onde.
 - **Os tópicos mudam com o número de tópicos e a semente.** Com poucos anúncios, o LDA é instável. Veja os Cuidados em [linguagem_natural.md](linguagem_natural.md).
 - **A busca da HDB conta páginas, não anúncios,** e só acha o que o OCR da própria BN leu certo.
-- **Uso responsável:** a ferramenta faz uma pausa fixa entre requisições, para não sobrecarregar a Biblioteca Nacional, e nunca contorna o CAPTCHA. Não reduza essas pausas.
+- **Uso responsável:** a ferramenta faz uma pausa fixa entre requisições, para não sobrecarregar a Biblioteca Nacional. Em listagens longas (depois de 200 passos), a pausa passa de 1,5 para 3 segundos. Quando o site pede espera (429 ou 503), a ferramenta espera e, se o bloqueio continuar, para. Nunca contorna o CAPTCHA. Não reduza essas pausas. As constantes estão em `src/hdb/config.py`.
 
 ## Termos usados neste guia
 
@@ -475,7 +491,9 @@ Quatro "views" (consultas prontas, que se usam como tabelas): `panorama` (o rank
 | **CAPTCHA** | código de imagem que o site pede para provar que há uma pessoa |
 | **segmento** | um pedaço de linha dentro de uma coluna |
 | **anúncio `largo`** | anúncio que provavelmente pega texto de mais de uma coluna |
-| **versão** (`v1`, `v2`) | qual regra de separação de anúncios gerou aquele resultado |
+| **versão** (`v1`, `v2`, `v2t`) | qual regra de separação de anúncios gerou aquele resultado; `v2t` é a separação só pelo texto do OCR |
 | **corpus** | o conjunto final de anúncios que vai para a análise |
 | **palavras do OCR** | a posição de cada palavra lida numa página; fica no banco (`paginas_palavras`) para separar os anúncios sem a imagem |
 | **modelagem de tópicos** | técnica que agrupa textos por temas que se repetem |
+| **palavras distintivas** | palavras que aparecem mais num grupo (período, tipo, sexo) do que nos outros, com teste estatístico |
+| **segmentação pelo texto** | separar os anúncios a partir só do texto do OCR, sem as posições das palavras (`v2t`) |

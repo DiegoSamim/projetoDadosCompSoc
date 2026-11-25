@@ -4,8 +4,8 @@ import numpy as np
 
 from hdb import config
 from hdb.banco import BancoMemoria
-from hdb.topicos import (ajustar, anuncios_tipicos, formatar_resumo, misturas, palavras_dos_topicos, processar,
-                         semente_representativa)
+from hdb.topicos import (REFERENCIAS, ajustar, anuncios_tipicos, equilibrado, formatar_resumo, misturas, nomear,
+                         palavras_dos_topicos, processar, semente_representativa)
 
 TEMAS = {
     "fuga": "fugiu escravo fugido fujao matto capitao rastro recompensa gratifica levou fugida",
@@ -126,3 +126,41 @@ def test_processar_com_semente_auto_grava_a_escolhida():
     banco = banco_com_corpus(textos)
     processar(banco, "corp1", 3, "auto", "t1")
     assert isinstance(banco.topico_modelos["t1"]["semente"], int)
+
+
+def test_nomear_sem_repetir_nome_e_com_sem_nome():
+    refs = {"Fuga": {"fugiu", "escravo", "levou"}, "Ama": {"leite", "ama", "meses"}}
+    nomes = nomear({0: ["fugiu", "escravo", "ama", "x"], 1: ["leite", "ama", "meses"], 2: ["nada", "disso"]}, refs)
+    assert nomes == {0: "Fuga", 1: "Ama", 2: "Tópico 2 (sem nome)"}
+    # os dois tópicos preferem "Ama": só um fica com ele (a atribuição ótima dá o outro a "Fuga" ou a nenhum)
+    nomes = nomear({0: ["leite", "ama", "fugiu", "escravo"], 1: ["leite", "ama", "meses"]}, refs)
+    assert len(set(nomes.values())) == 2 and nomes[1] == "Ama" and nomes[0] == "Fuga"
+    assert nomear({}, refs) == {} and nomear({3: ["leite"]}, refs) == {3: "Tópico 3 (sem nome)"}
+    assert len(REFERENCIAS) >= 6  # mais nomes que tópicos: a atribuição ótima usa só os melhores
+
+
+def test_equilibrado_tres_periodos_desiguais():
+    textos, temas = corpus(por_tema=20)
+    por = {"p1": [t for t, m in zip(textos, temas) if m == "fuga"],
+           "p2": [t for t, m in zip(textos, temas) if m == "ama"] + [t for t, m in zip(textos, temas) if m == "domestico"][:5],
+           "p3": [t for t, m in zip(textos, temas) if m == "domestico"][5:9]}
+    refs = {k: set(v.split()) for k, v in TEMAS.items()}
+    r = equilibrado(por, 8, sorteios=3, n_topicos=3, referencias=refs)
+    assert r["n_usado"] == {"p1": 8, "p2": 8, "p3": 4} and r["curtos"] == ["p3"]
+    assert len(r["sorteios"]) == 3 and r["sem_nome"] == 0
+    assert set(r["media"]) == {"fuga", "ama", "domestico"}
+    for nome in r["media"]:
+        for p in por:
+            assert r["minimo"][nome][p] <= r["media"][nome][p] <= r["maximo"][nome][p]
+    for p in por:  # em cada período as médias dos temas somam 1
+        assert abs(sum(r["media"][n][p] for n in r["media"]) - 1) < 1e-6
+    assert r["media"]["fuga"]["p1"] > 0.8 and r["media"]["ama"]["p2"] > r["media"]["ama"]["p1"]
+    assert equilibrado(por, 8, sorteios=3, n_topicos=3, referencias=refs)["media"] == r["media"]  # reprodutível
+
+
+def test_equilibrado_tema_sem_nome_nao_entra_na_media():
+    textos, temas = corpus(por_tema=10)
+    refs = {"fuga": set(TEMAS["fuga"].split())}
+    r = equilibrado({"p1": textos[:15], "p2": textos[15:]}, 10, sorteios=2, n_topicos=3, referencias=refs)
+    assert r["sem_nome"] == 4 and set(r["media"]) == {"fuga"}
+    assert all("(sem nome)" in s for s in r["sorteios"])

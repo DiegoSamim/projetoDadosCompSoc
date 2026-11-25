@@ -11,8 +11,8 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 ## Em cinco linhas
 
 1. A coleta fechou: **158 páginas** no banco, a amostra planejada está **completa (69 de 69)**, mais os extras.
-2. **Faltam separar 49 páginas** em anúncios, e isso só pode ser feito no computador de quem as capturou.
-3. A ferramenta já faz tudo, da captura aos **tópicos (LDA)**, e os 3 notebooks rodam com dados reais.
+2. **Faltam separar só 16 páginas** do JC dos anos 1860 (várias colunas), e isso só pode ser feito no computador de quem as capturou, porque precisa das imagens. As 33 páginas de 1827–1839 foram separadas só pelo texto (versão `v2t`).
+3. A ferramenta já faz tudo, da captura aos **tópicos (LDA)**, e os cadernos rodam com dados reais.
 4. A **Etapa 2 da limpeza está feita (25/11)**: regras de tipo (`c5`), corte de anúncios colados, erros de OCR e conferência por amostra, no corpus `corp3` e nos tópicos `t5`. Os números finais saem na próxima rodada. Ainda faltam 1887–1888 e as páginas sem separação.
 5. **Próximo passo do grupo:** nomear os tópicos (C2; Etapa 4 do [plano_dados.md](plano_dados.md)) e capturar o complemento (A3). Depois, contextualizar e montar os slides.
 
@@ -33,6 +33,22 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 ---
 
 ## Parte 1: O que está feito
+
+### Rodada de 25/11
+
+| Item | Situação |
+|---|---|
+| Bloqueio do site | **Feito.** A ferramenta espera quando o site pede, para depois de 3 respostas de bloqueio seguidas e não marca página como erro. `hdb buscar`, `amostra.py` e `capturar` param com a mensagem "tente de novo mais tarde" (código de saída 2). |
+| Segmentação só pelo texto (`v2t`) | **Feito** nos acervos 364568_01 e 364568_02 (JC 1827–1839). Não foi aplicada ao JC dos anos 1860, de várias colunas. |
+| Teto de tamanho do corpus (`longo`) | **Feito.** Texto com mais de 1.500 caracteres, em geral anúncios colados, fica fora do corpus. |
+| Guarda da classificação (`c5`) | **Feito.** Mais proteção contra anúncios de animal, documento oficial, polícia, fumo e cosmético. |
+| Palavras distintivas e nomes sugeridos dos tópicos | **Feito.** Os nomes são sugestão; o grupo decide. |
+| Períodos de mesmo tamanho | **Feito**, no caderno `equilibrio_periodos.ipynb`. |
+| Mudança por tipo | **Feito**, no caderno `mudanca_por_tipo.ipynb`. |
+| Categorias (qualidades, defeitos, marcas no corpo, ofício e cor) | **Feito**, no caderno `categorias_por_periodo.ipynb`. O grupo ainda escolhe quais destacar. |
+| Material do grupo | **Feito**, no caderno `material_do_grupo.ipynb`. |
+| Resumo de uma página | **Feito**: `resumo_dados.md`, com os números lidos do banco. |
+| Auditoria dos anúncios típicos | **Feita, meta não atingida.** Ver a seção do [plano_dados.md](plano_dados.md). |
 
 ### Os dados (24/11)
 
@@ -83,6 +99,10 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 | [como_funciona.ipynb](notebooks/como_funciona.ipynb) | o caminho inteiro, do jornal ao anúncio |
 | [analise_descritiva.ipynb](notebooks/analise_descritiva.ipynb) | tipo, sexo, idade, nação, recompensa e densidade por período |
 | [topicos_por_periodo.ipynb](notebooks/topicos_por_periodo.ipynb) | os tópicos por período, sexo, idade e tipo |
+| [equilibrio_periodos.ipynb](notebooks/equilibrio_periodos.ipynb) | os períodos com o mesmo número de anúncios |
+| [mudanca_por_tipo.ipynb](notebooks/mudanca_por_tipo.ipynb) | palavras distintivas e atributos por tipo e período |
+| [categorias_por_periodo.ipynb](notebooks/categorias_por_periodo.ipynb) | qualidades, defeitos, marcas, ofício e cor por período |
+| [material_do_grupo.ipynb](notebooks/material_do_grupo.ipynb) | material para o grupo: aluguéis duvidosos, temas para nomear, trocas do OCR e conferência |
 
 ### Os resultados provisórios
 
@@ -106,7 +126,7 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 
 | # | Tarefa | Quem | Tempo | Depende de | Pronto quando |
 |---|---|---|---|---|---|
-| A1 | **Separar as 49 páginas** (JC 1827–29: 15, JC 1830s: 18, JC 1860s: 16). `git pull`, depois `hdb anuncios` e `hdb campos`, **sem apagar `data/amostra/`**. Alternativa, sem as imagens: `hdb palavras --subir` envia ao banco o cache de `data/ocr_palavras/` (sem OCR novo), e depois `hdb anuncios` e `hdb campos` | quem capturou essas páginas | ~1 h | as imagens ou o cache `data/ocr_palavras/` existirem na máquina dele | nenhuma página com texto sem anúncios |
+| A1 | **Parcialmente feito.** As 33 páginas de JC 1827–1839 foram separadas só pelo texto (`v2t`). **Falta** as 16 páginas do JC dos anos 1860 (364568_05, várias colunas): `git pull`, depois `hdb palavras --subir` (envia o cache de `data/ocr_palavras/`, sem OCR novo), `hdb anuncios` e `hdb campos`, **sem apagar `data/amostra/`** | quem capturou essas páginas | ~1 h | as imagens ou o cache `data/ocr_palavras/` existirem na máquina dele | nenhuma página do JC dos anos 1860 com texto sem anúncios |
 | A2 | **Cobrir 1886–1888**: listar mais páginas de `"escrav* fugid*"` no JC 1880s (hoje só há 1880, 1881 e 1885) e capturar uma amostra sorteada por ano. **Situação:** listagem de 1886–1888 em andamento; falta capturar com `--cobertura` | Diego (listar) e quem captura | listar ~1 h; capturar ~8 páginas, 2 CAPTCHAs | nada | existem anúncios dos anos 1886, 1887 e 1888 |
 | A3 | **Complemento** (91 páginas, `--complemento`): 5 de 91 capturadas; extras 47 de 47. Os acervos DRJ 1860–78 e Correio Mercantil voltaram a responder | quem capturou | — | — | `scripts/amostra.py situacao` mostra o andamento |
 | A4 | **FEITO: palavras do OCR no banco.** A captura já separa os anúncios e grava as palavras (tabela `paginas_palavras`). Se as imagens da A1 sumiram, `hdb palavras --subir` envia o cache que estiver em `data/ocr_palavras/`; sem esse cache, as páginas precisam ser recapturadas, com CAPTCHA | Claude implementa; grupo recaptura | — | — | `hdb anuncios` refaz a separação a partir do banco |
@@ -139,6 +159,7 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 | D1 | **FEITO em 24/11.** Atualizar [guia_ferramenta.md](guia_ferramenta.md) e [linguagem_natural.md](linguagem_natural.md) com `corpus`, `topicos`, `c4`, `aluguel_incerto` e `--refazer` | Claude |
 | D2 | **FEITO em 24/11.** Atualizar a tabela de situação do [README](README.md) e de [projeto.md](projeto.md) | Claude |
 | D5 | **FEITO em 25/11.** Guia e linguagem natural atualizados com `c5`, `corp3`, `t5` e `t5i`, `rodar_tudo.py`, `avaliar_limpeza.py` e a repetição automática de consultas ao banco | Claude |
+| D6 | **FEITO em 25/11.** Guia, linguagem natural, planejamento e plano de dados atualizados com o bloqueio do site, a segmentação pelo texto, os cadernos novos e o resumo | Claude |
 | D3 | Tutorial de captura: a edição local do Diego (sem o passo do `.env`) ainda não foi commitada | Diego decide |
 | D4 | Confirmar com o professor a data da apresentação | Diego |
 
@@ -172,7 +193,7 @@ Em ordem de retorno para o projeto. Nenhuma é obrigatória.
 
 | # | Melhoria | Por quê | Esforço |
 |---|---|---|---|
-| M5 | **Um modelo por tipo** (só fuga, só aluguel…) além do geral | os tópicos hoje seguem em grande parte o tipo; dentro de cada tipo os temas mostram mudança real | baixo |
+| M5 | **PARCIAL, 25/11:** palavras distintivas e atributos dentro de cada tipo (`mudanca_por_tipo.ipynb`). **Pendente:** um modelo de tópicos por tipo (só fuga, só aluguel…) além do geral | os tópicos hoje seguem em grande parte o tipo; dentro de cada tipo os temas mostram mudança real | baixo |
 | M6 | **Expressões de duas palavras** ("ama de leite", "de nação", "bom cozinheiro") como uma unidade | o LDA separa palavras que só fazem sentido juntas | baixo |
 | M7 | **Métrica de coerência** (c_v, com `gensim`) além da estabilidade | escolher o número de tópicos por mais de um critério | baixo |
 | M8 | **Lista de grafias e de palavras vazias revisada pelo grupo** (Pessoas 2 e 3 do plano anterior). A primeira versão foi gerada pela ferramenta a partir das palavras mais frequentes | quem conhece o período acha o que a ferramenta não vê | baixo |
@@ -199,6 +220,7 @@ Em ordem de retorno para o projeto. Nenhuma é obrigatória.
 5. O OCR dos anos 1860–1880 é pior; sobram palavras quebradas e anúncios colados.
 6. **Os tópicos são padrões de palavras, não fatos.** Os nomes são hipóteses do grupo.
 7. A queda da fuga e a subida do aluguel entre os períodos são em parte efeito da composição da amostra (ver M1, M2 e M4).
+8. As páginas de 1827–1839 foram separadas só pelo texto do OCR (versão `v2t`), que é menos precisa que a separação pelas posições. A concordância entre as duas está em `scripts/validar_texto.py`.
 
 ---
 
@@ -206,7 +228,7 @@ Em ordem de retorno para o projeto. Nenhuma é obrigatória.
 
 | Risco | O que fazer |
 |---|---|
-| As imagens das 49 páginas não existem mais | plano B (A4): guardar as palavras no banco e recapturar |
+| As imagens das 16 páginas do JC dos anos 1860 não existem mais | plano B (A4): guardar as palavras no banco e recapturar |
 | O site da HDB bloqueia ou muda | amostra pequena, pausas fixas, nada repetido; avisar o Diego |
 | Os acervos do Diário do RJ e do Correio Mercantil continuam a falhar | seguir só com o Jornal do Commercio |
 | Poucos anúncios por período dão tópicos instáveis | rodar a estabilidade a cada mudança de corpus e usar k=6 |

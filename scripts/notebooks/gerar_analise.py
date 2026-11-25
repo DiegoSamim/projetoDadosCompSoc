@@ -59,9 +59,9 @@ def ler_tudo(consulta, bloco=1000):
 COLUNAS = ("id,bib,acervo,ano,pagina_fisica,periodo_legal,c_tipo,c_sexo,c_idade_min,c_idade_max,"
            "c_nacoes,c_condicao,c_recompensa,c_valor")
 df = ler_tudo(lambda: db.table("anuncios_completos").select(COLUNAS)
-              .eq("versao", config.VERSAO_ANUNCIOS).eq("c_versao", config.VERSAO_CAMPOS)
+              .in_("versao", list(config.VERSOES_ANUNCIOS)).eq("c_versao", config.VERSAO_CAMPOS)
               .neq("c_tipo", "outro").order("id"))
-print(f"{len(df)} anúncios relevantes (versão de anúncios {config.VERSAO_ANUNCIOS}, campos {config.VERSAO_CAMPOS})")
+print(f"{len(df)} anúncios relevantes (versões de anúncios {', '.join(config.VERSOES_ANUNCIOS)}, campos {config.VERSAO_CAMPOS})")
 if len(df) != __N_COM__:
     print(f"ATENÇÃO: os comentários deste caderno foram escritos para __N_COM__ anúncios e agora são {len(df)}: "
           "confira os números dos textos antes de usar.")

@@ -102,6 +102,8 @@ Para o **LDA** é isso: a "sacola de palavras" de cada anúncio. O **BERTopic** 
 
 **Decisão do grupo:** usar o **LDA** (`scikit-learn`). Ele é gratuito e rápido, não precisa baixar modelo e é fácil de explicar na apresentação. Testar de 6 a 10 tópicos e escolher pela leitura, não só pela métrica. O BERTopic fica para o fim, só se sobrar tempo.
 
+**Escolher a semente.** O LDA começa de um sorteio, e um anúncio a mais pode mudar os temas. Por isso o programa roda 10 sementes e usa a mais representativa, a que mais se parece com as demais (`--semente auto`).
+
 **Dois jeitos de comparar os períodos:**
 
 - **um modelo para todos os anúncios** e depois medir quanto cada período usa cada tópico. **É o que vamos usar**, porque com poucos anúncios é o jeito mais estável;
@@ -133,6 +135,14 @@ Com os tópicos nomeados, medimos quanto cada um pesa em cada período. A tabela
 
 Os campos já extraídos (sexo, idade) permitem fazer o mesmo **por gênero e idade**, por exemplo os tópicos dos anúncios de mulheres comparados com os de homens. Era um dos pedidos da reunião.
 
+### Comparar com cuidado
+
+Três recursos deixam a comparação entre períodos mais justa:
+
+- **Períodos de mesmo tamanho.** Os períodos têm quantidades de anúncios muito diferentes, e o maior puxa os temas para si. Por isso há uma versão em que cada período tem o mesmo número de anúncios, sorteados várias vezes, com a média dos resultados. Se os temas principais aparecem nas duas versões, a conclusão não depende do tamanho dos períodos. É o caderno `equilibrio_periodos.ipynb`.
+- **Mudança dentro de cada tipo.** Os temas seguem muito o tipo de anúncio (fuga, venda, aluguel). Por isso o caderno `mudanca_por_tipo.ipynb` compara cada tipo consigo mesmo, entre os períodos.
+- **Palavras distintivas.** Em vez de listar só as palavras mais frequentes, o computador mostra as que aparecem mais num grupo (um período ou um tipo) do que nos outros, com um teste estatístico que descarta as palavras comuns demais. Esse é o critério por trás das palavras mostradas nos cadernos (`src/hdb/distintivas.py`).
+
 ## Regras de limpeza
 
 Antes de contar palavras, o computador decide **quais anúncios entram**. Estas regras foram mudadas em 25/11 (versões `c5` na classificação e `corp3` no corpus):
@@ -144,6 +154,17 @@ Antes de contar palavras, o computador decide **quais anúncios entram**. Estas 
 | "Preto livre" escrito de forma explícita | Vira `outro`. |
 | Dois anúncios colados num pedaço só, com outra abertura (VENDE-SE, FUGIO…) no meio | Corta no início do outro anúncio e fica com o primeiro trecho que tem pessoa. O texto original não muda. |
 | Erro de OCR na primeira letra (`luga`→`aluga`, `ozinha`→`cozinha`) | Corrigido sozinho no corpus. |
+| Texto muito longo (mais de 1.500 caracteres), em geral vários anúncios colados numa só caixa | Fica fora do corpus (motivo `longo`). Um texto assim quase sempre mistura temas, e cortá-lo com segurança não é possível. |
+| Anúncios de animal (com diminutivos e termos de cavalo), de documento oficial ou de polícia, de fumo e de cosmético | A guarda ficou mais forte. Em anúncio de fuga ou de coisa perdida, só uma marca forte (escravo, forro, moleque, nação, "de nome") protege o anúncio. Em venda e aluguel, a palavra de pessoa tem de vir antes da palavra de animal. |
+| "Ama de leite" | Só conta como pessoa escravizada se a pessoa aparecer no começo do anúncio. "Senhora ama de leite" é uma pessoa livre, por isso não entra. |
+
+### Separar os anúncios só pelo texto
+
+Na maioria das páginas, a separação usa a posição de cada palavra na imagem. Algumas páginas têm só o texto lido pelo OCR, guardado no banco, sem essas posições. Para elas, a ferramenta separa os anúncios só pelo texto: procura as aberturas (VENDE-SE, FUGIO…) e os números de aviso.
+
+- **Vale para:** páginas de poucas colunas e anúncios numerados, como o Diário do Rio e o Jornal do Commercio dos anos 1820 e 1830. Foi aplicado só a esses dois acervos.
+- **Não vale para:** jornais de várias colunas. O programa de leitura junta linhas de colunas vizinhas, e o anúncio sai misturado. Essas páginas continuam esperando as imagens, para a separação com posições.
+- **Como conferir:** `scripts/validar_texto.py` compara, nas mesmas páginas, a separação só pelo texto com a separação com posições. O resultado é guardado como versão própria (`v2t`), ao lado da outra; nada se perde.
 
 **A variante `corp3i`.** Existe também uma versão do corpus que inclui os anúncios de aluguel sem marca de escravizado (`aluguel_incerto`, como "criada"). Ela serve **só para comparar**: mostra se a conclusão muda quando esses anúncios entram. O corpus principal (`corp3`) continua sem eles. Os tópicos dessa versão são os `t5i`.
 
@@ -167,7 +188,8 @@ Depois, a análise (passos 5 e 6) é feita em um notebook, lendo o banco ([noteb
 ## Cuidados
 
 - **Tópico não é fato histórico.** É um padrão de palavras. Quem dá sentido é a leitura do grupo, com a contextualização.
-- **Poucos anúncios dão tópicos instáveis.** Com algumas centenas de anúncios, rode mais de uma vez e veja se os tópicos se repetem.
+- **Poucos anúncios dão tópicos instáveis.** Com algumas centenas de anúncios, rode mais de uma vez e veja se os tópicos se repetem. A semente automática (`--semente auto`) ajuda, mas não substitui essa conferência.
+- **O nome de cada tópico é sugestão.** O computador dá um nome a partir das palavras (`nomear`), e a cada rodada os números dos tópicos podem mudar. Quem nomeia é o grupo, lendo as palavras e alguns anúncios típicos.
 - **Estabilidade medida:** k=6 repete 50% dos tópicos com similaridade ≥0,8 (k=4, 58%; k=8, 43%; k=12, 34%; corpus de 2.094 anúncios, 24/11). Por isso o k=6 é o principal, e o k=8 entra como comparação. Rode `scripts/estabilidade_topicos.py` a cada mudança no corpus.
 - **O OCR deixa ruído.** Palavras erradas podem formar um "tópico de lixo". A padronização e o corte de confiança reduzem isso.
 - **Anúncios grudados misturam temas.** Às vezes dois ou três anúncios vizinhos saem como um só. O corpus `corp3` já corta o pedaço na abertura de outro anúncio e fica com o primeiro trecho que tem pessoa. Usar o travessão ("—") como divisor do jornal continua planejado.

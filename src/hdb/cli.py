@@ -8,7 +8,7 @@ from pathlib import Path
 
 from hdb import config
 from hdb.banco import BancoSupabase
-from hdb.busca import coletar_ocorrencias, nova_sessao
+from hdb.busca import SiteIndisponivel, coletar_ocorrencias, nova_sessao
 
 
 def _banco():
@@ -19,7 +19,13 @@ def _banco():
 
 
 def cmd_buscar(args):
-    salvas, total = coletar_ocorrencias(nova_sessao(), args.bib, args.termo, _banco(), limite=args.limite)
+    banco = _banco()
+    try:
+        salvas, total = coletar_ocorrencias(nova_sessao(), args.bib, args.termo, banco, limite=args.limite)
+    except SiteIndisponivel as e:
+        print(f"{e}. {banco.contar_ocorrencias(args.bib, args.termo)} ocorrências de {args.termo!r} "
+              f"ficaram salvas; tente de novo mais tarde (a busca continua de onde parou).")
+        raise SystemExit(2)
     if total == 0:
         print(f"Nenhuma ocorrência de {args.termo!r} no acervo {args.bib}.")
         return
@@ -29,9 +35,11 @@ def cmd_buscar(args):
 def cmd_capturar(args):
     from hdb.captura import capturar
 
-    capturar(_banco(), args.quem, bib=args.bib, termo=args.termo, max_paginas=args.max_paginas,
-             aleatorio=args.aleatorio, modo=args.modo, tamanho=args.tamanho, workers=args.workers,
-             guardar=args.guardar_imagens, segmentar=not args.sem_segmentar, equilibrar=args.equilibrar)
+    bloqueado = capturar(_banco(), args.quem, bib=args.bib, termo=args.termo, max_paginas=args.max_paginas,
+                         aleatorio=args.aleatorio, modo=args.modo, tamanho=args.tamanho, workers=args.workers,
+                         guardar=args.guardar_imagens, segmentar=not args.sem_segmentar, equilibrar=args.equilibrar)
+    if bloqueado:  # o site pediu para esperar: sai com código 2 para quem encadeia comandos
+        raise SystemExit(2)
 
 
 def cmd_importar(args):
@@ -49,12 +57,37 @@ def cmd_reprocessar(args):
 def cmd_anuncios(args):
     from hdb.captura import anuncios_das_paginas, anuncios_do_arquivo
 
+    if args.do_texto:
+        return _anuncios_do_texto(args.bib)
     if args.palavras:
         anuncios_do_arquivo(args.palavras, args.imagem, args.depurar)
         return
     banco = None if args.sem_banco else _banco()
     anuncios_das_paginas(banco, args.pasta, versao=args.versao, limite=args.limite, depurar=args.depurar,
                          refazer=args.refazer)
+
+
+def _anuncios_do_texto(bibs=None):
+    """Segmenta, só pelo texto do OCR, as páginas sem anúncios (v2 nem v2t) e grava como v2t.
+
+    Só vale para páginas de poucas colunas e anúncios numerados (o Diário do Rio, o JC dos anos 1820 e 1830): em
+    páginas de várias colunas o Tesseract emenda linhas vizinhas e o resultado sai bem pior. `bibs` limita os acervos.
+    """
+    from hdb.anuncios_texto import VERSAO_ANUNCIOS_TEXTO, separar_texto
+
+    banco = _banco()
+    paginas = banco.paginas_sem_anuncios(config.VERSAO_ANUNCIOS)
+    if bibs:
+        do_acervo = set()
+        for i in range(0, len(paginas), 100):
+            do_acervo |= {l["id"] for l in banco.cliente.table("paginas").select("id").in_("bib", list(bibs))
+                          .in_("id", paginas[i:i + 100]).execute().data}
+        paginas = [p for p in paginas if p in do_acervo]
+    total = 0
+    for pagina_id in paginas:
+        texto, confianca = banco.texto_da_pagina(pagina_id)
+        total += banco.registrar_anuncios(pagina_id, VERSAO_ANUNCIOS_TEXTO, separar_texto(texto, confianca))
+    print(f"{len(paginas)} páginas segmentadas pelo texto ({VERSAO_ANUNCIOS_TEXTO}): {total} anúncios")
 
 
 def cmd_palavras(args):
@@ -189,6 +222,9 @@ def criar_parser():
     p.add_argument("--quem", default=getpass.getuser(), help="quem roda (por ora só informativo)")
     p.add_argument("--palavras", type=Path, help="JSON de palavras já pronto: segmenta só ele, sem OCR nem banco")
     p.add_argument("--imagem", type=Path, help="com --palavras: a imagem, para a depuração")
+    p.add_argument("--bib", nargs="+", help="com --do-texto: só estes acervos (ex.: 364568_01 364568_02)")
+    p.add_argument("--do-texto", action="store_true",
+                   help="segmenta só pelo texto do OCR (sem imagem) as páginas sem anúncios v2 e grava como v2t")
     p.set_defaults(func=cmd_anuncios)
 
     p = sub.add_parser("palavras", help="envia ao banco as palavras do OCR guardadas em disco, para segmentar "

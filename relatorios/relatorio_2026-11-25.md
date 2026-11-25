@@ -1,6 +1,6 @@
 # Relatório metodológico da coleta
 
-Gerado em 25/11/2026 04:01. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
+Gerado em 25/11/2026 05:22. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
 
 ## 1. Regras da busca da HDB
 
@@ -120,6 +120,7 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 285 págin
 |---|---|---|---|
 | v1 | 3.958 | 159 | 39 |
 | v2 | 31.769 | 388 | 236 |
+| v2t | 632 | 0 | 33 |
 
 ### Campos, versão c1
 
@@ -159,12 +160,12 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 285 págin
 
 ### Campos, versão c5
 
-31.769 anúncios.
+32.401 anúncios.
 
-- Tipo: outro: 29.432, aluguel: 857, venda: 559, fuga: 479, ama_de_leite: 223, aluguel_incerto: 185, compra: 34
-- Sexo: (sem sexo): 27.945, f: 1.947, m: 1.612, ambos: 265
-- Com idade: 762; com nome: 283; com recompensa: 478
-- Nações mais comuns: Mina (63), Angola (51), Benguela (51), Moçambique (38), Cabinda (37), Congo (27), Moange (12), Monjolo (6), Rebolo (6), Inhambane (5)
+- Tipo: outro: 29.874, aluguel: 896, venda: 637, fuga: 525, ama_de_leite: 237, aluguel_incerto: 189, compra: 43
+- Sexo: (sem sexo): 28.277, f: 2.072, m: 1.742, ambos: 310
+- Com idade: 847; com nome: 323; com recompensa: 521
+- Nações mais comuns: Mina (74), Angola (61), Benguela (58), Moçambique (50), Cabinda (48), Congo (32), Moange (13), Inhambane (8), Monjolo (7), Rebolo (7)
 
 ## 6. Panorama de acervos
 

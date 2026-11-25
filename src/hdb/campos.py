@@ -62,7 +62,7 @@ DETERMINANTES = {
 CONTEXTO_DEPOIS = re.compile(
     r"\b(?:de\s+\d{1,2}\b|\d{1,2}\s*a[nu]{1,2}[o0]s|por\s+nome|de\s+nome|de\s+nacao|nacao|que\s+sab[eh]|"
     r"que\s+tem|official\s+de)")
-SRA = re.compile(r"\b(?:huma|uma)\s+(?:sra|senhora)\b")  # "ALUGA-SE uma senhora portugueza": gente livre
+SRA = re.compile(r"\b(?:h?ua|h?uma|uma)\s+(?:sra|senhora)\b")  # "ALUGA-SE uma senhora portugueza": gente livre
 JANELA_PESSOA = 200  # caracteres iniciais onde a pessoa anunciada tem de aparecer (ver `_motivo_de_outro`)
 NACIONALIDADE_LIVRE = re.compile(  # quem é "portuguez", "ingleza"... num anúncio de negócio é gente livre, não escravizada
     r"\b(?:portugue[sz]a?s?|ingle[sz]a?s?|franc[ae][sz]a?s?|alle?m[aã]o?e?s?|italian[oa]s?|"
@@ -78,8 +78,9 @@ NAVIO = re.compile(r"\bequip\w*\.?\s*\d|\bpassag\w*\.?\s*\d|\bcarga\b")  # movim
 # ("boa letra" é qualidade de quem escreve; só "letra de câmbio/do tesouro") e "mulher"/"filho". Só vale se a janela
 # não tiver marca de escravizado (cor, escravo, forro, moleque), senão "vende-se uma preta e um cavallo" cairia.
 NAO_PESSOA = re.compile(
-    r"\b(?:cao|caes|cachorr[oa]s?|gatos?|gatas?|cava+llos?|cavalos?|eguas?|burros?|bois?|vacas?|porcos?|carneiros?"
-    r"|papagaios?|passaros?|cabritos?|mulas?|jumentos?|bestas?"  # animais
+    r"\b(?:cao|caes|cachorr(?:o|a|inh[oa])s?|gat(?:o|a|inh[oa])s?|cava+[l1]+i?(?:o|inh[oa])s?|eguas?|burros?|bois?|vacas?|porcos?"
+    r"|carneiros?|papagaios?|passaros?|cabritos?|mulas?|jumentos?|bestas?|peguira|petigu\w+|pangar[eé]|poldr[oa]s?|potr[oa]s?"  # animais
+    r"|decretos?|portarias?|extractos?|rape|tabaco"  # documentos oficiais, polícia e fumo
     r"|cautelas?|apolices?|letras?\s+(?:de\s+cambio|do\s+thesouro)|bilhetes?|loterias?"  # papéis
     r"|medicamentos?|pilulas?|xaropes?|unguentos?|remedios?|banhos?|rheumatismo|cosmeticos?|pomadas?|sabonetes?|arrobe|chancres?|venereos?|syphili\w+"  # remédios
     r"|guarnicao|guarnicoes|escaleres?|fragatas?|brigues?|tripulacao|tripulacoes|embarcacao|embarcacoes)\b")
@@ -271,11 +272,28 @@ def _sinal_de_pessoa(norm):
                 or _parece_escravo(norm))
 
 
-def _animal_papel_remedio_navio(norm):
-    """A palavra de NAO_PESSOA nos primeiros JANELA_PESSOA caracteres sem marca de escravizado nem palavra de pessoa ali, ou None."""
+def _marca_forte(norm):
+    """Marca que protege um anúncio da guarda de animais: escravo, forro, moleque, nação, "de nome", "natural de"."""
+    return bool(ESCRAVIZADO.search(norm) or FORRO.search(norm) or MARCA_ESCRAVIZADO.search(norm)
+                or re.search(r"\bnacao\b|\b(?:de|por)\s+nome\b|\bnatural\s+d[aeo]s?\b", norm))
+
+
+def _animal_papel_remedio_navio(norm, verbo=None):
+    """A palavra de NAO_PESSOA nos primeiros JANELA_PESSOA caracteres que tira o anúncio de pessoa, ou None.
+
+    Protege uma marca forte (`_marca_forte`) em qualquer lugar da janela. Em anúncio de fuga ou de coisa perdida
+    (`verbo` None ou "fuga") só ela protege: "cachorrinha preta" ou "cavallo de cor preta" não é gente. Em venda,
+    aluguel ou compra, uma pessoa ou cor protege **só se vier antes** da palavra de animal ("uma preta e um cavallo");
+    "vende-se um cavallo preto" fica de fora.
+    """
     inicio = _janela(norm)
     m = NAO_PESSOA.search(inicio)
-    return m.group() if m and not (_marca_de_escravizado(inicio, com_cabra=False) or _pessoas(inicio)) else None
+    if not m or _marca_forte(inicio):
+        return None
+    if verbo in (None, "fuga"):
+        return m.group()
+    antes = inicio[:m.start()]
+    return None if _pessoas(antes) or _marca_de_escravizado(antes, com_cabra=False) else m.group()
 
 
 def _janela(norm):
@@ -351,7 +369,7 @@ def _classificar(anuncio):
     norm = _simples(texto)
     abertura = anuncio.get("abertura") or achar_abertura(texto) or achar_numeracao(texto)
     verbo = _verbo(abertura, norm)
-    lixo = _animal_papel_remedio_navio(norm)
+    lixo = _animal_papel_remedio_navio(norm, verbo)
     if lixo:
         return "outro", False, f"sem pessoa; animal/papel/remédio/navio: {lixo}"
     if _titulo_de_fuga(anuncio.get("titulo")):
@@ -374,6 +392,11 @@ def _classificar(anuncio):
         return "outro", False, _motivo_de_outro(norm) if verbo else None
     procura = verbo in ("precisa", "compra")
     if LEITE.search(norm):
+        inicio = _janela(norm)
+        if not _pessoas(inicio):  # a "ama" só aparece num anúncio colado adiante (c5)
+            return "outro", False, "ama de leite sem pessoa nos primeiros 200 caracteres"
+        if SRA.search(inicio) and not _marca_de_escravizado(inicio):
+            return "outro", False, "pessoa livre (senhora ama de leite)"
         return "ama_de_leite", procura, None
     if verbo is None:
         return "outro", False, None

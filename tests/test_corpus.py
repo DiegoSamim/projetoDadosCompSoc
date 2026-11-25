@@ -205,3 +205,9 @@ def test_regravar_o_corpus_remove_quem_deixou_de_ser_selecionado():
                                   {"anuncio_id": 3, "tipo": "venda"}])  # regra mais rígida: o 2 vira "outro"
     processar(banco, "c2", "corp1")
     assert banco.ids_do_corpus("corp1") == [1, 3]
+
+
+def test_texto_longo_demais_fica_fora_do_corpus():
+    longo = "Vende-se uma preta engomadeira de bom genio e saude; " * 40  # ~2.000 caracteres: vários anúncios colados
+    assert motivo_descarte({"c_tipo": "venda", "texto": longo, "confianca": 90}) == "longo"
+    assert motivo_descarte({"c_tipo": "venda", "texto": longo[:600], "confianca": 90}) is None

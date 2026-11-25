@@ -3,7 +3,9 @@ from pathlib import Path
 import pytest
 from bs4 import BeautifulSoup
 
-from hdb import busca
+import requests
+
+from hdb import busca, config
 from hdb.armazenamento import ler_csv_parcial
 from hdb.banco import BancoMemoria
 
@@ -116,3 +118,122 @@ def test_coletar_nao_mexe_em_pagina_existente(servidor):
 def test_coletar_sem_resultados(monkeypatch):
     monkeypatch.setattr(busca, "abrir_busca", lambda *a: ("u", BeautifulSoup("<p></p>", "lxml")))
     assert busca.coletar_ocorrencias(None, "x", "y", BancoMemoria()) == (0, 0)
+
+
+# ---------- bloqueio do site (429/503) ----------
+
+class RespostaFalsa:
+    def __init__(self, status, headers=None):
+        self.status_code, self.headers = status, headers or {}
+        self.text = ""
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"{self.status_code} erro")
+
+
+class SessaoRoteirizada:
+    """Devolve as respostas na ordem; a última se repete."""
+
+    def __init__(self, *respostas):
+        self.respostas, self.chamadas = list(respostas), 0
+
+    def request(self, metodo, url, **kwargs):
+        r = self.respostas[min(self.chamadas, len(self.respostas) - 1)]
+        self.chamadas += 1
+        return r
+
+
+@pytest.fixture
+def esperas(monkeypatch):
+    """Troca o sono por uma lista: nenhum teste dorme."""
+    lista = []
+    monkeypatch.setattr(busca, "_dormir", lista.append)
+    return lista
+
+
+def test_429_com_retry_after_espera_o_pedido(esperas):
+    sessao = SessaoRoteirizada(RespostaFalsa(429, {"Retry-After": "5"}), RespostaFalsa(200))
+    assert busca._requisitar(sessao, "GET", "u").status_code == 200
+    assert esperas == [5, config.PAUSA]
+
+
+def test_retry_after_em_data_http(esperas):
+    from email.utils import format_datetime
+    from datetime import datetime, timedelta, timezone
+
+    data = format_datetime(datetime.now(timezone.utc) + timedelta(seconds=100), usegmt=True)
+    sessao = SessaoRoteirizada(RespostaFalsa(503, {"Retry-After": data}), RespostaFalsa(200))
+    busca._requisitar(sessao, "GET", "u")
+    assert 95 <= esperas[0] <= 100
+
+
+def test_retry_after_respeita_o_teto(esperas):
+    sessao = SessaoRoteirizada(RespostaFalsa(429, {"Retry-After": "99999"}), RespostaFalsa(200))
+    busca._requisitar(sessao, "GET", "u")
+    assert esperas[0] == config.ESPERA_BLOQUEIO_MAX
+
+
+def test_429_sem_cabecalho_espera_60_e_dobra(esperas):
+    sessao = SessaoRoteirizada(RespostaFalsa(429), RespostaFalsa(429), RespostaFalsa(200))
+    busca._requisitar(sessao, "GET", "u")
+    assert esperas == [60, 120, config.PAUSA]
+
+
+def test_503_volta_ao_normal_na_segunda_tentativa(esperas):
+    sessao = SessaoRoteirizada(RespostaFalsa(503), RespostaFalsa(200))
+    assert busca._requisitar(sessao, "GET", "u").status_code == 200
+    assert sessao.chamadas == 2 and esperas[0] == 60
+
+
+def test_bloqueio_esgotado_levanta_site_indisponivel(esperas):
+    sessao = SessaoRoteirizada(RespostaFalsa(429))
+    with pytest.raises(busca.SiteIndisponivel) as e:
+        busca._requisitar(sessao, "GET", "u")
+    assert sessao.chamadas == config.TENTATIVAS_BLOQUEIO
+    assert esperas == [60, 120]  # não dorme depois da última resposta
+    assert e.value.status == 429 and e.value.depois_de == 240
+    assert "pediu para esperar (429)" in str(e.value) and "tente de novo depois" in str(e.value)
+
+
+def test_404_continua_erro_comum(esperas):
+    sessao = SessaoRoteirizada(RespostaFalsa(404))
+    with pytest.raises(requests.HTTPError):
+        busca._requisitar(sessao, "GET", "u")
+    assert sessao.chamadas == config.TENTATIVAS
+    assert esperas == [2, 4, 8, 16]
+
+
+def test_erro_de_conexao_continua_erro_comum(esperas):
+    class Cai:
+        def request(self, *a, **k):
+            raise requests.ConnectionError("caiu")
+
+    with pytest.raises(requests.ConnectionError):
+        busca._requisitar(Cai(), "GET", "u")
+
+
+def test_pausa_longa_depois_de_200_passos(servidor, esperas, monkeypatch):
+    monkeypatch.setattr(config, "LISTAGEM_PASSOS_PAUSA_LONGA", 200)
+    servidor.total = 205
+    busca.coletar_ocorrencias(None, "x", "y", BancoMemoria())
+    # o servidor falso não dorme; só os passos além do 200º ganham a pausa extra (3 - 1,5 s)
+    assert esperas == [config.PAUSA_LISTAGEM_LONGA - config.PAUSA] * 4  # passos 201 a 204 (a 1ª ocorrência não avança)
+
+
+def test_sem_pausa_longa_antes_do_limite(servidor, esperas):
+    busca.coletar_ocorrencias(None, "x", "y", BancoMemoria())
+    assert esperas == []
+
+
+def test_listagem_mantem_o_gravado_e_propaga(servidor, monkeypatch):
+    def cai_no_quarto(sessao, url, soup):
+        if servidor.pos == 3:
+            raise busca.SiteIndisponivel("pediu para esperar", 429)
+        return servidor.avancar(sessao, url, soup)
+
+    monkeypatch.setattr(busca, "proxima_ocorrencia", cai_no_quarto)
+    banco = BancoMemoria()
+    with pytest.raises(busca.SiteIndisponivel):
+        busca.coletar_ocorrencias(None, "x", "y", banco)
+    assert banco.contar_ocorrencias("x", "y") == 3  # nada apagado

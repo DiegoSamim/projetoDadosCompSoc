@@ -79,7 +79,7 @@ dist = ler_tudo(lambda: db.table("anuncio_topicos").select("anuncio_id,topico,pr
                 .eq("versao", MODELO).order("anuncio_id").order("topico"))
 anuncios = ler_tudo(lambda: db.table("anuncios_completos")
                     .select("id,periodo_legal,c_tipo,c_sexo,c_idade_min,c_idade_max,ano,texto")
-                    .eq("versao", config.VERSAO_ANUNCIOS).eq("c_versao", config.VERSAO_CAMPOS).order("id"))
+                    .in_("versao", list(config.VERSOES_ANUNCIOS)).eq("c_versao", config.VERSAO_CAMPOS).order("id"))
 print(f"{dist['anuncio_id'].nunique()} anúncios no modelo {MODELO}; {len(anuncios)} anúncios com campos {config.VERSAO_CAMPOS} no banco")
 ''')
 code('''
@@ -87,22 +87,10 @@ PERIODOS = ["antes de 1831", "1831–1850", "1850–1871", "1871–1888"]
 def periodo_curto(p):
     return p if p.startswith("antes") else p.split(" ")[0]
 
-# Nomes SUGERIDOS (provisórios): o grupo deve confirmar
-# Nomes SUGERIDOS: o LDA numera os tópicos ao acaso (a cada rodada o T0 pode ser outro), então cada nome vem das
-# palavras de referência abaixo: o tópico recebe o nome cujas palavras mais aparecem entre as suas 12 de maior peso.
-REFERENCIAS = {
-    "Fuga: nome, idade e dono": {"anos", "dia", "escravo", "idade", "tiver", "nome", "contra", "souber", "dias", "cor"},
-    "Fuga: roupa levada e nação": {"levou", "nacao", "fugiu", "levar", "sera", "corrente", "dia", "preto"},
-    "Ama de leite": {"leite", "ama", "meses", "carinhosa", "parto", "criancas", "parda"},
-    "Serviço doméstico (aluguel e venda de mulheres)": {"lava", "cozinha", "engoma", "lavar", "engomar", "cozinhar", "servico", "aluga", "preta"},
-    "Venda de moleques e pretos (lotes)": {"moleque", "pretos", "dois", "vendem", "pagem", "proprio", "cozinheiro"},
-    "Venda com preço e qualidades": {"preco", "perfeito", "bonita", "pardo", "forno", "bem", "todo", "servico", "vende"},
-}
-from scipy.optimize import linear_sum_assignment
-_topo = {t: set(g.sort_values("peso", ascending=False)["palavra"].head(12)) for t, g in palavras[palavras.versao == MODELO].groupby("topico")}
-_ts, _nomes = sorted(_topo), list(REFERENCIAS)
-_custo = [[-len(_topo[t] & REFERENCIAS[n]) for n in _nomes] for t in _ts]
-NOMES = {_ts[i]: (_nomes[j] if -_custo[i][j] >= 2 else f"Tópico {_ts[i]} (sem nome)") for i, j in zip(*linear_sum_assignment(_custo))}
+# Nomes SUGERIDOS (hipóteses do grupo): o LDA numera os tópicos ao acaso, então hdb.topicos.nomear dá a cada tópico
+# o nome (de topicos.REFERENCIAS) cujas palavras mais aparecem entre as suas 12 de maior peso.
+from hdb.topicos import REFERENCIAS, nomear
+NOMES = nomear({t: g.sort_values("peso", ascending=False)["palavra"].head(12) for t, g in palavras[palavras.versao == MODELO].groupby("topico")})
 K = len(NOMES)
 rot = lambda t: f"T{t} {NOMES[t]}"
 
@@ -301,10 +289,7 @@ pal_i = ler_tudo(lambda: db.table("topico_palavras").select("versao,topico,palav
                  .order("topico").order("peso", desc=True))
 dist_i = ler_tudo(lambda: db.table("anuncio_topicos").select("anuncio_id,topico,proporcao").eq("versao", VARIANTE)
                   .order("anuncio_id").order("topico"))
-topo_i = {t: set(g.sort_values("peso", ascending=False)["palavra"].head(12)) for t, g in pal_i.groupby("topico")}
-ts_i = sorted(topo_i)
-custo_i = [[-len(topo_i[t] & REFERENCIAS[n]) for n in _nomes] for t in ts_i]
-nomes_i = {ts_i[i]: (_nomes[j] if -custo_i[i][j] >= 2 else f"Tópico {ts_i[i]} (sem nome)") for i, j in zip(*linear_sum_assignment(custo_i))}
+nomes_i = nomear({t: g.sort_values("peso", ascending=False)["palavra"].head(12) for t, g in pal_i.groupby("topico")})
 pivo_i = dist_i.pivot(index="anuncio_id", columns="topico", values="proporcao").rename(columns=nomes_i)
 com_i = anuncios.drop_duplicates("id").set_index("id")[["periodo_legal"]].join(pivo_i, how="inner")
 com_i["periodo"] = pd.Categorical(com_i["periodo_legal"].map(periodo_curto), categories=PERIODOS, ordered=True)

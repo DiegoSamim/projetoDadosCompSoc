@@ -15,7 +15,10 @@ from itertools import chain
 from io import BytesIO
 from pathlib import Path
 
+import requests
+
 from hdb import acervos, anuncios, config, layout, ocr
+from hdb.busca import STATUS_BLOQUEIO, SiteIndisponivel, _espera_do_cabecalho, mensagem_bloqueio, nova_sessao
 from hdb.armazenamento import ler_csv_parcial
 from hdb.palavras import comprimir_palavras, descomprimir_palavras  # noqa: F401 (reexportadas)
 
@@ -204,6 +207,23 @@ def _capturar_pagina(page, context, pagina, modo, tamanho, abrir):
     return captchas, largura, altura, nbytes
 
 
+def testar_site(sessao=None):
+    """Uma única requisição simples à página inicial do leitor, para saber se o site está bloqueando.
+
+    Chamada quando a imagem não aparece: 429/503 (ou falha de conexão) levanta `SiteIndisponivel`;
+    qualquer outra resposta significa que o site atende e o problema é da página. Nunca mexe no CAPTCHA.
+    """
+    sessao = sessao or nova_sessao()  # a mesma sessão e USER_AGENT das listagens
+    try:
+        r = sessao.get(config.BASE_URL, timeout=config.TIMEOUT)
+    except requests.RequestException as e:
+        raise SiteIndisponivel(f"não consegui falar com o site da BN ({type(e).__name__}); tente de novo depois") from e
+    if r.status_code in STATUS_BLOQUEIO:
+        pedida = _espera_do_cabecalho(r.headers.get("Retry-After"))
+        raise SiteIndisponivel(mensagem_bloqueio(r.status_code), r.status_code,
+                               config.ESPERA_BLOQUEIO if pedida is None else pedida)
+
+
 # ---------- OCR e banco ----------
 
 def _ignorar_sigint():
@@ -319,11 +339,14 @@ def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, 
     """Reserva páginas do banco (até `max_paginas`, em lotes), captura (uma pessoa resolve o CAPTCHA) e faz o OCR.
 
     Com `equilibrar`, as páginas saem uma de cada ano por rodada (sorteadas dentro do ano).
-    Com `segmentar`, cada página gravada também tem as palavras e os anúncios gravados (sem derrubar a página se falhar)."""
+    Com `segmentar`, cada página gravada também tem as palavras e os anúncios gravados (sem derrubar a página se falhar).
+    Se a imagem não aparece e o site responde 429/503, a captura encerra sem registrar erro na página (a reserva é
+    devolvida no `finally`, por `banco.liberar_reservas`) e a função devolve True (bloqueado)."""
     from playwright.sync_api import sync_playwright
 
     contagem = {"ok": 0, "erro": 0}
     total_captchas = 0
+    bloqueado = False
     bib_aberto = None
     pendentes = {}
     config.TMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -355,6 +378,15 @@ def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, 
                         print("\nEntrada encerrada durante o CAPTCHA; captura interrompida.")
                         break  # a página volta para a fila em liberar_reservas, sem gastar tentativa
                     except Exception as e:
+                        if isinstance(e, TimeoutError):
+                            try:
+                                testar_site()
+                            except SiteIndisponivel as bloqueio:
+                                # sem registrar_erro: a página não tem culpa; volta para a fila em liberar_reservas
+                                print(f"\n{pagina['bib']} p.{pagfis}: a imagem não veio e {bloqueio}. "
+                                      f"Captura encerrada; a página volta para a fila (sem gastar tentativa).")
+                                bloqueado = True
+                                break
                         erro = f"{type(e).__name__}: {e}".splitlines()[0]
                         bib_aberto = None  # força um goto novo na próxima página
                         banco.registrar_erro(pagina["id"], quem, "captura", erro, time.monotonic() - inicio, 0)
@@ -370,6 +402,7 @@ def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, 
                 context.close()
         _gravar_prontos(banco, quem, pendentes, contagem, guardar, esperar=True)
         _resumo(contagem, total_captchas)
+        return bloqueado
     except KeyboardInterrupt:
         print("\nInterrompido; as páginas não concluídas voltam para a fila.")
         for futuro in pendentes:

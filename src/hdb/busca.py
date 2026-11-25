@@ -4,6 +4,8 @@ Usa só `requests`: o DocReader é um formulário ASP.NET, e "próxima ocorrênc
 """
 import re
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from urllib.parse import quote
 
 import requests
@@ -18,19 +20,76 @@ def nova_sessao() -> requests.Session:
     return sessao
 
 
+_dormir = time.sleep  # os testes trocam por uma função que só anota a espera
+STATUS_BLOQUEIO = (429, 503)  # Too Many Requests e Service Unavailable: o site pede para esperar
+
+
+class SiteIndisponivel(Exception):
+    """O site respondeu 429/503 (ou não responde) mesmo depois de esperar; `depois_de` = segundos sugeridos."""
+
+    def __init__(self, mensagem, status=None, depois_de=config.ESPERA_BLOQUEIO):
+        super().__init__(mensagem)
+        self.status = status
+        self.depois_de = depois_de
+
+
+def mensagem_bloqueio(status):
+    return f"o site da BN pediu para esperar ({status}); tente de novo depois"
+
+
+def _espera_do_cabecalho(valor):
+    """Segundos do `Retry-After` (número ou data HTTP); None se ausente ou ilegível."""
+    if not valor:
+        return None
+    valor = valor.strip()
+    if valor.isdigit():
+        return int(valor)
+    try:
+        data = parsedate_to_datetime(valor)
+    except (TypeError, ValueError):
+        return None
+    if data.tzinfo is None:
+        data = data.replace(tzinfo=timezone.utc)
+    return max(0, int((data - datetime.now(timezone.utc)).total_seconds()))
+
+
+def _espera_bloqueio(resposta, bloqueios):
+    """Espera antes de tentar de novo: o `Retry-After`, ou ESPERA_BLOQUEIO dobrando a cada bloqueio (teto: MAX)."""
+    pedida = _espera_do_cabecalho(resposta.headers.get("Retry-After"))
+    if pedida is None:
+        pedida = config.ESPERA_BLOQUEIO * 2 ** (bloqueios - 1)
+    return min(pedida, config.ESPERA_BLOQUEIO_MAX)
+
+
 def _requisitar(sessao, metodo, url, **kwargs):
-    """GET/POST com novas tentativas e espera crescente; respeita a pausa entre requisições."""
+    """GET/POST com novas tentativas e espera crescente; respeita a pausa entre requisições.
+
+    429 e 503 têm tratamento à parte: espera o que o site pedir (ou 60 s, 120 s...) e, se o bloqueio
+    persistir por TENTATIVAS_BLOQUEIO respostas, levanta `SiteIndisponivel`. Os outros erros
+    seguem com a espera de 2, 4, 8 s.
+    """
     ultimo_erro = None
-    for tentativa in range(config.TENTATIVAS):
+    erros = bloqueios = 0
+    while True:
         try:
             r = sessao.request(metodo, url, timeout=config.TIMEOUT, **kwargs)
+            if r.status_code in STATUS_BLOQUEIO:
+                bloqueios += 1
+                espera = _espera_bloqueio(r, bloqueios)
+                if bloqueios >= config.TENTATIVAS_BLOQUEIO:
+                    raise SiteIndisponivel(mensagem_bloqueio(r.status_code), r.status_code, espera)
+                print(f"O site respondeu {r.status_code}; esperando {espera} s antes de tentar de novo.", flush=True)
+                _dormir(espera)
+                continue
             r.raise_for_status()
-            time.sleep(config.PAUSA)
+            _dormir(config.PAUSA)
             return r
         except requests.RequestException as e:
             ultimo_erro = e
-            time.sleep(2 ** (tentativa + 1))
-    raise ultimo_erro
+            erros += 1
+            _dormir(2 ** erros)
+            if erros >= config.TENTATIVAS:
+                raise ultimo_erro
 
 
 def _campos_formulario(soup):
@@ -107,8 +166,20 @@ def coletar_ocorrencias(sessao, bib, termo, banco, limite=None):
     """Percorre até `limite` ocorrências (todas, se None) e grava cada uma no banco.
 
     Devolve (ocorrências no banco, total do servidor). Se a coleta cair, uma nova chamada continua
-    de onde parou, avançando as ocorrências já salvas sem registrá-las de novo.
+    de onde parou, avançando as ocorrências já salvas sem registrá-las de novo. Se o site pedir para
+    esperar (`SiteIndisponivel`), o que já foi gravado fica e a exceção sobe; depois de
+    LISTAGEM_PASSOS_PAUSA_LONGA passos a pausa fixa entre requisições passa a PAUSA_LISTAGEM_LONGA.
     """
+    passos = 0
+
+    def avancar(soup):
+        nonlocal passos
+        soup = proxima_ocorrencia(sessao, url, soup)
+        passos += 1
+        if passos > config.LISTAGEM_PASSOS_PAUSA_LONGA:  # listagem longa: alivia o servidor (pausa fixa)
+            _dormir(max(config.PAUSA_LISTAGEM_LONGA - config.PAUSA, 0))
+        return soup
+
     url, soup = abrir_busca(sessao, bib, termo)
     total = total_do_rotulo(soup)
     if total == 0:
@@ -119,11 +190,11 @@ def coletar_ocorrencias(sessao, bib, termo, banco, limite=None):
     # O servidor guarda a posição na sessão, então reposicionar custa uma requisição por
     # ocorrência já salva (com a pausa de sempre). Não há atalho conhecido.
     for _ in range(max(feitas - 1, 0)):
-        soup = proxima_ocorrencia(sessao, url, soup)
+        soup = avancar(soup)
 
     while feitas < alvo:
         if feitas:
-            soup = proxima_ocorrencia(sessao, url, soup)
+            soup = avancar(soup)
         linha = ler_ocorrencia(soup, bib, ocorrencia=feitas + 1)
         linha["termo"] = termo  # a retomada conta por este termo; o campo da página pode vir diferente
         banco.registrar_ocorrencia(linha)

@@ -491,3 +491,26 @@ def test_c5_guarda_de_animal_nao_derruba_ama_de_leite_com_anuncio_colado():
 def test_c5_cosmetico_e_remedio_com_leite_nao_sao_ama_de_leite():
     assert classificar({"texto": "COSMETICO Vende-se na rua do Rosario n. 25 — o leite de rosas da D. Felicidade embelleza as mulheres"})[0] == "outro"
     assert classificar({"texto": "O Arrobe Laffeeteur é precioso contra as molestias dos negros; um chancre no meato urinario, leite de vaca"})[0] == "outro"
+
+
+def test_c5_auditoria_cachorrinha_cavalo_e_ama_colada():
+    """Casos reais da auditoria dos anúncios mais típicos de cada tópico."""
+    # fuga/perdido: só marca forte protege, a cor do bicho ("preta", "de cor preta") não
+    assert classificar({"texto": "Perdeu-se, no dia 26 do corrente, da mão de um rapaz que conduzia presa a um cordel, uma cachorrinha preta, com a cauda e orelhas cortadas, que desappareceu da rua do Conde e acode pelo nome de Galatéa; quem a tiver achado queira entregar"})[0] == "outro"
+    assert classificar({"texto": "DESAPPARECEU, no dia 28 do corrente, da cocheira da rua da Princeza, um peguira inteiro, de cor preta, com uma malha em um pé; quem o entregar será gratificado", "abertura": "DESAPPARECEU"})[0] == "outro"
+    # venda: a pessoa antes do animal protege, o animal antes da cor não
+    assert classificar({"texto": "23 Vende-se hum bom cavallo preto todo, sem manha; na rua do Piolho casa n. 118", "abertura": "N."})[0] == "outro"
+    assert classificar({"texto": "VENDE-SE uma preta de 20 annos, que lava e cozinha, e tambem um cavallo russo; na rua do Ouvidor n. 40"})[0] == "venda"
+    # ama de leite: a pessoa tem de estar na janela inicial, e "senhora ama de leite" é livre
+    assert classificar({"texto": "RIQUISS muto finas, unico alimento que presentemente se acha, 70 por 70, escolhidas a vontade do comprador; na travessa do Guindaste n. 2, segundo andar; e nos domingos na rua Direita defronte do n. 45, varejo, uma ama de leite com sua cria"})[0] == "outro"
+    assert classificar({"texto": "PRECISA-SE de hua senhora ama de leite, para criar huma criança de 9 mezes, que se queira transportar para Lisboa; para tratar, na rua do Hospicio n. 53", "abertura": "PRECISA-SE"})[0] == "outro"
+    assert classificar({"texto": "ALUGA-SE uma parda de 18 annos, perfeita ama de leite, do primeiro parto; na rua de S. Pedro n. 314", "abertura": "ALUGA-SE"})[0] == "ama_de_leite"
+
+
+def test_c5_documento_oficial_fumo_e_cavalo_mal_lido_nao_sao_pessoa():
+    """Tipos de lixo achados na 2ª rodada da auditoria (anúncios típicos que a regra não tinha visto)."""
+    assert classificar({"texto": "Extracto diario do dia 6 de dezembro de 1847. Na freguezia do Sacramento forão presos: Antonio José Ferreira, por desordem, e o escravo Francisco, Benguella, por proferir palavras obscenas", "abertura": "N."})[0] == "outro"
+    assert classificar({"texto": "COPIA DO DECRETO. Hei por bem suspender do exercicio de juiz de paz da freguezia de Nossa Senhora da Guia a Bento José Veloso e mandá-lo responsabilisar"})[0] == "outro"
+    assert classificar({"texto": "VENDE-SE na rua de S. José n. 155, rapé arêa e meio, pagando-se o premio que se convencionar, preta e princeza de superior qualidade", "abertura": "VENDE-SE"})[0] == "outro"
+    assert classificar({"texto": "VENDE-SE hum cavalio castanho, de 7 palmos de alto, manço e muito bonito, proprio para huma carruagem; na rua Ourives n. 79", "abertura": "VENDE-SE"})[0] == "outro"
+    assert classificar({"texto": "VENDE-SE hum preto de 20 annos, bom cozinheiro, sem vicios; na rua do Ouvidor n. 12 — vende-se tambem hum cavallo russo", "abertura": "VENDE-SE"})[0] == "venda"

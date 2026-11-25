@@ -38,6 +38,7 @@ def ambiente(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONTAGENS_CSV", tmp_path / "contagens_termos.csv")
     monkeypatch.setattr(config, "PAGINAS_CSV", tmp_path / "paginas_por_acervo.csv")
     monkeypatch.setattr(config, "PAUSA_CAPTURA", 0)
+    monkeypatch.setattr(captura, "testar_site", lambda *a, **k: None)  # nunca toca a rede; site "ok"
     monkeypatch.setattr(captura, "_criar_executor", lambda workers: ThreadPoolExecutor(workers))
     monkeypatch.setattr(ocr, "extrair_texto", ocr_falso)
     monkeypatch.setattr(config, "OCR_PALAVRAS_DIR", tmp_path / "cache")
@@ -186,6 +187,75 @@ def test_entrada_encerrada_no_captcha_nao_gasta_tentativa(ambiente, monkeypatch)
     banco = banco_com([1])
     captura.capturar(banco, "ana")
     assert banco.paginas[1]["status"] == "pendente" and banco.paginas[1]["tentativas"] == 0
+
+
+class RespostaFalsa:
+    def __init__(self, status, headers=None):
+        self.status_code, self.headers = status, headers or {}
+
+
+class SessaoDoTeste:
+    """Sessão que devolve (ou levanta) o que foi combinado e conta os GETs."""
+
+    def __init__(self, resposta):
+        self.resposta, self.gets = resposta, []
+
+    def get(self, url, timeout=None):
+        self.gets.append((url, timeout))
+        if isinstance(self.resposta, Exception):
+            raise self.resposta
+        return self.resposta
+
+
+def site_responde(monkeypatch, resposta):
+    """`testar_site` real, com a sessão simulada no lugar da rede."""
+    sessao = SessaoDoTeste(resposta)
+    monkeypatch.setattr(captura, "testar_site", lambda: _testar_site_real(sessao))
+    return sessao
+
+
+_testar_site_real = captura.testar_site  # guardado antes de a fixture `ambiente` trocar por um falso
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_bloqueio_no_timeout_nao_registra_erro_e_devolve_a_pagina(ambiente, monkeypatch, capsys, status):
+    navegador_falso(monkeypatch, quebrar_em=2)
+    sessao = site_responde(monkeypatch, RespostaFalsa(status, {"Retry-After": "120"}))
+    banco = banco_com([1, 2, 3])
+    assert captura.capturar(banco, "ana") is True
+    assert banco.paginas[2]["tentativas"] == 0 and banco.paginas[2]["status"] == "pendente"
+    assert banco.paginas[2]["reservada_por"] is None  # liberar_reservas devolveu a reserva
+    assert banco.paginas[3]["status"] == "pendente"  # nem chegou a ser tentada
+    assert not [t for t in banco.tentativas if t["status"] == "erro"]
+    assert len(sessao.gets) == 1 and sessao.gets[0][1] == config.TIMEOUT
+    assert "pediu para esperar" in capsys.readouterr().out
+
+
+def test_conexao_recusada_no_teste_tambem_e_bloqueio(ambiente, monkeypatch):
+    import requests
+
+    navegador_falso(monkeypatch, quebrar_em=1)
+    site_responde(monkeypatch, requests.ConnectionError("sem rota"))
+    banco = banco_com([1])
+    assert captura.capturar(banco, "ana") is True
+    assert banco.paginas[1]["tentativas"] == 0 and banco.paginas[1]["status"] == "pendente"
+
+
+def test_timeout_com_site_ok_registra_erro_como_antes(ambiente, monkeypatch):
+    navegador_falso(monkeypatch, quebrar_em=2)
+    sessao = site_responde(monkeypatch, RespostaFalsa(200))
+    banco = banco_com([1, 2, 3])
+    assert not captura.capturar(banco, "ana")
+    assert banco.paginas[2]["status"] == "erro" and banco.paginas[2]["tentativas"] == 1
+    assert banco.pagina("1", 3)["status"] == "ok"  # a captura seguiu para a página seguinte
+    assert len(sessao.gets) == 1
+
+
+def test_testar_site_levanta_com_retry_after_e_aceita_200():
+    with pytest.raises(captura.SiteIndisponivel) as e:
+        _testar_site_real(SessaoDoTeste(RespostaFalsa(429, {"Retry-After": "30"})))
+    assert (e.value.status, e.value.depois_de) == (429, 30)
+    assert _testar_site_real(SessaoDoTeste(RespostaFalsa(200))) is None
 
 
 def test_imagem_orfa_e_processada_sem_capturar(ambiente, monkeypatch):

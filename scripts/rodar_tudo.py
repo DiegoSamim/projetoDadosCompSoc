@@ -2,7 +2,10 @@
 
 Uso: python scripts/rodar_tudo.py [--rapido] [--sem-notebooks] [--so PASSO]
 
-Passos, em ordem: campos, corpus, corpus_i, topicos, topicos_i, estabilidade, relatorio, notebooks.
+Passos, em ordem: campos, corpus, corpus_i, topicos, topicos_i, estabilidade, relatorio, resumo, notebooks.
+O passo `resumo` escreve resumo_dados.md (scripts/resumo_dados.py). O passo `notebooks` gera e executa, nesta ordem:
+analise_descritiva (gerar_analise), topicos_por_periodo (gerar_topicos), equilibrio_periodos (gerar_equilibrio),
+mudanca_por_tipo (gerar_tipos), categorias_por_periodo (gerar_categorias) e material_do_grupo (gerar_material).
 Cada um roda em um subprocesso (PYTHONPATH=src, mesmo Python). Para no primeiro erro e diz como retomar
 (`--so PASSO` roda só aquele). Grava tudo em data/rodar_tudo.log.
 """
@@ -18,6 +21,10 @@ RAIZ = Path(__file__).resolve().parents[1]
 LOG = RAIZ / "data" / "rodar_tudo.log"
 NOTEBOOKS = RAIZ / "scripts" / "notebooks"
 ULTIMAS = 6
+# (gerador, caderno), na ordem em que são gerados e executados
+CADERNOS = [("gerar_analise.py", "analise_descritiva"), ("gerar_topicos.py", "topicos_por_periodo"),
+            ("gerar_equilibrio.py", "equilibrio_periodos"), ("gerar_tipos.py", "mudanca_por_tipo"),
+            ("gerar_categorias.py", "categorias_por_periodo"), ("gerar_material.py", "material_do_grupo")]
 
 
 def _hdb(*args):
@@ -38,9 +45,9 @@ def passos():
         ("topicos_i", [_hdb("topicos", "--versao-corpus", "corp3i", "--topicos", "6", "--semente", "auto", "--versao", "t5i")]),
         ("estabilidade", [_script(RAIZ / "scripts" / "estabilidade_topicos.py")]),
         ("relatorio", [_hdb("relatorio")]),
-        ("notebooks", [_script(NOTEBOOKS / "gerar_analise.py"), _script(NOTEBOOKS / "gerar_topicos.py"),
-                       _script(NOTEBOOKS / "executar_notebook.py", str(RAIZ / "notebooks" / "analise_descritiva.ipynb")),
-                       _script(NOTEBOOKS / "executar_notebook.py", str(RAIZ / "notebooks" / "topicos_por_periodo.ipynb"))]),
+        ("resumo", [_script(RAIZ / "scripts" / "resumo_dados.py")]),
+        ("notebooks", [c for gerador, caderno in CADERNOS for c in (
+            _script(NOTEBOOKS / gerador), _script(NOTEBOOKS / "executar_notebook.py", str(RAIZ / "notebooks" / f"{caderno}.ipynb")))]),
     ]
 
 

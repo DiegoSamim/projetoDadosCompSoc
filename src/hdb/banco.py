@@ -108,6 +108,24 @@ class _Retentando:
         return atributo
 
 
+VERSOES_ANUNCIOS = ("v2", "v2t")  # v2 = segmentação com posições; v2t = a partir do texto do OCR (hdb.anuncios_texto)
+
+
+def _versoes(versao_anuncios):
+    """Versões a ler: "v2" (a padrão) vale também para "v2t"; outra string vale só ela; tupla/lista vale como veio."""
+    if isinstance(versao_anuncios, str):
+        return VERSOES_ANUNCIOS if versao_anuncios == VERSOES_ANUNCIOS[0] else (versao_anuncios,)
+    return tuple(versao_anuncios)
+
+
+def _melhor_texto(leituras):
+    """(texto, confianca) da leitura de maior confiança; (None, None) sem leituras."""
+    if not leituras:
+        return None, None
+    melhor = max(leituras, key=lambda t: t.get("confianca") or 0)
+    return melhor["texto"], melhor["confianca"]
+
+
 def _todas(consulta, tamanho=1000):
     """Todas as linhas de uma consulta ordenada; a API devolve no máximo 1000 por chamada (cada uma com novas tentativas)."""
     linhas, inicio = [], 0
@@ -240,6 +258,21 @@ class BancoSupabase:
         linhas = _todas(self.cliente.table("anuncios").select("id,pagina_id").eq("versao", versao).order("id"))
         return {l["pagina_id"] for l in linhas}
 
+    def paginas_sem_anuncios(self, versao_anuncios="v2"):
+        """`pagina_id`s (ordenados) com status 'ok' e texto do OCR que não têm anúncios de nenhuma das versões
+        (`versao_anuncios` e, se for "v2", também "v2t"); são as candidatas à segmentação só pelo texto."""
+        ok = {l["id"] for l in _todas(self.cliente.table("paginas").select("id").eq("status", "ok").order("id"))}
+        com_texto = {l["pagina_id"] for l in _todas(self.cliente.table("textos_ocr").select("pagina_id")
+                                                    .order("pagina_id"))}
+        feitas = set()
+        for v in _versoes(versao_anuncios):
+            feitas |= self.paginas_com_anuncios(v)
+        return sorted((ok & com_texto) - feitas)
+
+    def texto_da_pagina(self, pagina_id):
+        """(texto, confianca) da leitura de maior confiança da página; (None, None) se não há."""
+        return _melhor_texto(self.textos(pagina_id))
+
     def registrar_palavras(self, pagina_id, dados):
         """Grava (ou substitui) as palavras do OCR da página; `dados` = {largura, altura, palavras}."""
         self._rpc("registrar_palavras", p_pagina_id=pagina_id, p_largura=dados["largura"],
@@ -259,9 +292,9 @@ class BancoSupabase:
                                                .order("pagina_id"))}
 
     def anuncios_para_campos(self, versao_anuncios):
-        """Todos os anúncios da versão como [{id, titulo, abertura, texto}], por id."""
+        """Todos os anúncios da versão como [{id, titulo, abertura, texto}], por id ("v2" inclui "v2t"; ver `_versoes`)."""
         return _todas(self.cliente.table("anuncios").select("id,titulo,abertura,texto")
-                      .eq("versao", versao_anuncios).order("id"))
+                      .in_("versao", list(_versoes(versao_anuncios))).order("id"))
 
     def registrar_campos(self, versao, campos):
         """Grava (upsert por anúncio e versão) as linhas [{anuncio_id, tipo, ...}]. Devolve quantas."""
@@ -502,6 +535,16 @@ class BancoMemoria:
     def paginas_com_anuncios(self, versao):
         return {id_ for (id_, v), lista in self.lista_anuncios.items() if v == versao and lista}
 
+    def paginas_sem_anuncios(self, versao_anuncios="v2"):
+        feitas = set()
+        for v in _versoes(versao_anuncios):
+            feitas |= self.paginas_com_anuncios(v)
+        com_texto = {id_ for (id_, _) in self.leituras}
+        return sorted(i for i in com_texto if self.paginas.get(i, {}).get("status") == "ok" and i not in feitas)
+
+    def texto_da_pagina(self, pagina_id):
+        return _melhor_texto(self.textos(pagina_id))
+
     def registrar_palavras(self, pagina_id, dados):
         self.palavras[pagina_id] = {"largura": dados["largura"], "altura": dados["altura"],
                                     "palavras_gz": comprimir_palavras(dados), "n_palavras": len(dados["palavras"])}
@@ -514,7 +557,7 @@ class BancoMemoria:
         return set(self.palavras)
 
     def anuncios_para_campos(self, versao_anuncios):
-        achados = [a for (_, v), lista in self.lista_anuncios.items() if v == versao_anuncios for a in lista]
+        achados = [a for (_, v), lista in self.lista_anuncios.items() if v in _versoes(versao_anuncios) for a in lista]
         return [{k: a.get(k) for k in ("id", "titulo", "abertura", "texto")} for a in sorted(achados, key=lambda a: a["id"])]
 
     def registrar_campos(self, versao, campos):
