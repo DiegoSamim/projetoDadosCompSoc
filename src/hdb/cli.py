@@ -246,8 +246,8 @@ def criar_parser():
 
     p = sub.add_parser("corpus", help="seleciona os anúncios de pessoas escravizadas e grava o texto padronizado "
                                       "(para a modelagem de tópicos) ao lado do original")
-    p.add_argument("--versao-campos", default=config.VERSAO_CAMPOS,
-                   help=f"versão dos campos (tipo) a usar na seleção (padrão: {config.VERSAO_CAMPOS})")
+    p.add_argument("--versao-campos", default=config.VERSAO_CAMPOS_CORPUS,
+                   help=f"versão dos campos (tipo) a usar na seleção (padrão: {config.VERSAO_CAMPOS_CORPUS})")
     p.add_argument("--versao", default=config.VERSAO_CORPUS,
                    help=f"versão do corpus; regravar a mesma substitui (padrão: {config.VERSAO_CORPUS}; com --incluir-incertos, o padrão ganha um 'i')")
     p.add_argument("--incluir-incertos", action="store_true",

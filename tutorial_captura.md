@@ -1,14 +1,8 @@
 # Tutorial rápido: capturar as páginas
 
-Para quem **só vai capturar** (a análise fica com a equipe). Você não precisa entender o código nem mexer no git: é preparar uma vez e rodar **um comando**.
-
 **O que acontece:** o site da Hemeroteca só mostra a imagem de cada página depois de um **CAPTCHA** (letras tortas). Você digita o código; o computador baixa a imagem, lê o texto e grava no banco compartilhado. O resto é automático. Nunca tente resolver o CAPTCHA por programa.
 
 ## Parte 1: preparar (uma vez só, uns 10 minutos)
-
-Use o terminal do Linux/Ubuntu (no Windows, o terminal do WSL).
-
-**1. Peça ao Diego o arquivo `.env`**, por mensagem privada (nunca em grupo). Ele é a chave do banco.
 
 **2. Copie e cole estes comandos, um bloco por vez:**
 

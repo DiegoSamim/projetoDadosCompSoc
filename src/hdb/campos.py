@@ -41,7 +41,7 @@ TITULOS_FUGA = ("ESCRAVOS FUGIDOS",)
 
 PESSOAS = {  # palavra de pessoa (sem plural) -> sexo da pessoa anunciada (None: não diz)
     "preto": "m", "pretinho": "m", "pardo": "m", "crioulo": "m", "crioulinho": "m", "escravo": "m",
-    "moleque": "m", "molecote": "m", "negrinho": "m", "mulato": "m", "negro": "m", "cativo": "m",
+    "moleque": "m", "maleque": "m", "muleque": "m", "molecote": "m", "negrinho": "m", "mulato": "m", "negro": "m", "cativo": "m",
     "captivo": "m", "liberto": "m", "fulo": "m", "africano": "m", "rapaz": "m", "menino": "m", "criado": "m",
     "preta": "f", "pretinha": "f", "parda": "f", "crioula": "f", "crioulinha": "f", "escrava": "f",
     "negrinha": "f", "molecota": "f", "moleca": "f", "mulata": "f", "negra": "f", "cativa": "f", "captiva": "f",
@@ -61,7 +61,8 @@ DETERMINANTES = {
 }
 CONTEXTO_DEPOIS = re.compile(
     r"\b(?:de\s+\d{1,2}\b|\d{1,2}\s*a[nu]{1,2}[o0]s|por\s+nome|de\s+nome|de\s+nacao|nacao|que\s+sab[eh]|"
-    r"que\s+tem|official\s+de)")
+    r"que\s+tem|official\s+de)|\A\s*(?:fugid[oa]|(?:escur|clar|retint)[oa])s?\b")  # "escravo fugido", "pardo escuro"
+COR_ANTES = {"cor", "raca"}  # "cor preta", "côr um tanto fula", "raça negra": cor, não a pessoa
 SRA = re.compile(r"\b(?:h?ua|h?uma|uma)\s+(?:sra|senhora)\b")  # "ALUGA-SE uma senhora portugueza": gente livre
 JANELA_PESSOA = 200  # caracteres iniciais onde a pessoa anunciada tem de aparecer (ver `_motivo_de_outro`)
 NACIONALIDADE_LIVRE = re.compile(  # quem é "portuguez", "ingleza"... num anúncio de negócio é gente livre, não escravizada
@@ -179,11 +180,19 @@ def _pessoas(norm):
     tokens, aceitas, validas = _tokens(norm), set(), []
     for k, (raw, i, j) in enumerate(tokens):
         palavra = _singular(raw)
+        if palavra not in PESSOAS and re.match(r"huma?(?=[a-z]{4})", raw):  # "humescravo": artigo colado pelo OCR
+            palavra, i = _singular(re.sub(r"^huma?", "", raw)), i + (4 if raw.startswith("huma") else 3)
+            if palavra in PESSOAS:
+                validas.append((palavra, i, j))
+                aceitas.add(k)
+            continue
         if palavra not in PESSOAS or norm[i - 1:i] == "-" or norm[j:j + 1] == "-":  # "arta-preta": composto
             continue
         if palavra == "cabra" and not _marca_fora_cabra(_janela(norm)):  # c5: "uma cabra branca" é bicho
             continue
         antes = range(max(0, k - 2), k)
+        if any(tokens[a][0] in COR_ANTES for a in range(max(0, k - 3), k)):
+            continue
         numeral = re.search(r"\d\s*$", norm[:i])
         if (k == 0 or numeral or any(_e_determinante(tokens[a][0]) or a in aceitas for a in antes)
                 or CONTEXTO_DEPOIS.search(norm[j:j + 45])):

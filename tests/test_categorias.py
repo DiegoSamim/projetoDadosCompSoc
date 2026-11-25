@@ -1,3 +1,5 @@
+import pytest
+
 from hdb.categorias import DEFEITOS, MARCAS_CORPO, QUALIDADES, categorias, contar, ocorrencias
 
 
@@ -58,3 +60,41 @@ def test_texto_vazio_e_posicoes():
     texto = "Preta FIEL"
     (canonica, i, j), = ocorrencias(texto, QUALIDADES)
     assert (canonica, texto[i:j]) == ("fiel", "FIEL")
+
+
+# --- marcas: léxico ampliado e OCR (trechos reais do conjunto de desenvolvimento) ---
+
+@pytest.mark.parametrize("texto", [
+    "tem a orelha esquerda furada, pouca barba cor meia fula",
+    "orelhys furadas e cheio do corpo",
+    "com os dentes de diante quebrados, e huma cicattiz junto",
+    "tem um sigual na cabeça de carregar carga; olho vesgo",
+    "com um siznal no pescoço, levou em sua companhia",
+    "tem signnes de escrophulas no pescoço",
+    "Levou huma argola de ferro ao pescoço, he alto e magro",
+    "tem hum dedo da mão esquerda torto",
+    "hum moleque, tem no peito esquerdo a marca A. J. G. e huma pequena rotura no embigo",
+    "marcado com a marca (1S) no peito esquerdo",
+    "com um risco na cara do lado direito",
+    "cego de hum olho, desdentado",
+    "tem uma mancha e uma verruga no rosto",
+])
+def test_marcas_novas(texto):
+    assert categorias(texto)["marcas"]
+
+
+@pytest.mark.parametrize("texto", [
+    "preto de bons dentes, sem vicios, cor preta, estatura regular",
+    "tem dentes brancos e bonitos",
+    "mucama que cose, marcar roupa e engommar",
+    "Aluga-se preta que marca e lava",
+    "deu sinal de 20$000 para a compra",
+    "recebeu sinal de dinheiro",
+    "comprou um ferro de engomar e hum ferreiro",
+    "com os signaes seguintes: altura regular",
+    "cujos signaes: pés grandes, beiços grossos, barbado",
+    "olhos grandes, pés grossos e olho vivo",
+    "sem vícios e com dentes bons",
+])
+def test_marcas_negativos(texto):
+    assert categorias(texto)["marcas"] == []

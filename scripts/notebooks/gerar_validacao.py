@@ -246,6 +246,51 @@ else:
 com("c2c")
 
 md("""
+## 2d. Segundo teste cego: marcas no corpo e sexo (97 anúncios)
+As regras de **marcas no corpo** e de **sexo** foram corrigidas olhando o desenvolvimento e o primeiro teste. O **segundo teste** (`tests/fixtures/campos_teste2.json`,
+60 fugas e 37 aluguéis que nenhuma regra viu) foi rotulado **antes** de rodar o código novo. Abaixo, o código novo nele e, para as marcas, a **verdade rotulada**
+juntando os três conjuntos de fugas (desenvolvimento, teste 1 e teste 2), por período.
+""")
+code('''
+ARQ_T2 = RAIZ / "tests" / "fixtures" / "campos_teste2.json"
+teste2 = [g for g in json.loads(ARQ_T2.read_text(encoding="utf-8")) if g.get("rotulos")] if ARQ_T2.exists() else []
+if not teste2:
+    display(Markdown("_Sem segundo teste rotulado._"))
+else:
+    from scipy.stats import fisher_exact
+    R2 = validacao.comparar(teste2)
+    linhas = []
+    for campo, nome in (("marcas", "Marcas no corpo (fugas)"), ("sexo", "Sexo f/m (todos)")):
+        m = validacao.metricas(R2[campo][validacao.TOTAL])
+        linhas.append({"Campo": nome, "Precisão [IC 95%]": fmt(m["precisao"]), "Cobertura [IC 95%]": fmt(m["cobertura"])})
+    ac = R2["sexo_acerto"][validacao.TOTAL]
+    print(f"{len(teste2)} anúncios de teste ({sum(g['tipo'] == 'fuga' for g in teste2)} fugas); "
+          f"sexo certo entre os que ambos acharam: {ac['vp']} de {ac['vp'] + ac['fp']}")
+    display(pd.DataFrame(linhas).set_index("Campo"))
+
+    def verdade(g):
+        return bool(g["rotulos"].get("marcas"))
+    def vista(g):
+        return bool(validacao.extrair_para_comparar(g["texto"])["marcas"])
+    f2 = [g for g in teste2 if g["tipo"] == "fuga"]
+    f1 = [g for g in teste if g["tipo"] == "fuga"]
+    fd = [g for g in rotulados if g["tipo"] == "fuga"]
+    linhas = []
+    for fonte, conj, fn in (("código, teste 2", f2, vista), ("verdade, teste 2", f2, verdade),
+                            ("verdade, três conjuntos", f2 + f1 + fd, verdade)):
+        ks = []
+        for per in PERIODOS:
+            gp = [g for g in conj if periodo_curto(g["periodo"]) == per]
+            ks.append((sum(fn(g) for g in gp), len(gp)))
+        (k1, n1), (k2, n2) = ks[0], ks[-1]
+        p = fisher_exact([[k1, n1 - k1], [k2, n2 - k2]])[1]
+        linhas.append({"Fonte": fonte, **{per: f"{k}/{n} ({100 * k / n:.0f}%)" for per, (k, n) in zip(PERIODOS, ks)},
+                       "p (1º × último)": "<0,001" if p < 0.001 else f"{p:.3f}".replace(".", ",")})
+    display(pd.DataFrame(linhas).set_index("Fonte"))
+''')
+com("c2d")
+
+md("""
 ## 3. Onde o código erra
 Até 10 **falsos negativos** (o campo existe e o código não achou) e 10 **falsos positivos** (o código marcou e não devia) por campo,
 com o começo do texto, o rótulo e o que o código extraiu.

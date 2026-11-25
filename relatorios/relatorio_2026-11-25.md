@@ -1,6 +1,6 @@
 # Relatório metodológico da coleta
 
-Gerado em 25/11/2026 21:10. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
+Gerado em 25/11/2026 22:32. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
 
 ## 1. Regras da busca da HDB
 
@@ -179,6 +179,15 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 299 págin
 
 - Tipo: outro: 32.133, aluguel: 902, venda: 638, fuga: 540, ama_de_leite: 240, aluguel_incerto: 197, compra: 43
 - Sexo: (sem sexo): 30.517, f: 2.103, m: 1.763, ambos: 310
+- Com idade: 996; com nome: 326; com recompensa: 622
+- Nações mais comuns: Angola (61), Benguela (58), Moçambique (50), Cabinda (48), Congo (33), Mina (19), Moange (14), Inhambane (8), Monjolo (7), Rebolo (7)
+
+### Campos, versão c7
+
+34.693 anúncios.
+
+- Tipo: outro: 32.129, aluguel: 903, venda: 640, fuga: 540, ama_de_leite: 240, aluguel_incerto: 198, compra: 43
+- Sexo: (sem sexo): 30.492, f: 2.098, m: 1.800, ambos: 303
 - Com idade: 996; com nome: 326; com recompensa: 622
 - Nações mais comuns: Angola (61), Benguela (58), Moçambique (50), Cabinda (48), Congo (33), Mina (19), Moange (14), Inhambane (8), Monjolo (7), Rebolo (7)
 

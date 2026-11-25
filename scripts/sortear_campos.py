@@ -27,7 +27,7 @@ PERIODOS = ["antes de 1831", "1831–1850", "1850–1871", "1871–1888"]
 MAX_CARACTERES = 700
 FIXTURES = RAIZ / "tests" / "fixtures"
 SAIDA = FIXTURES / "campos_gold.json"
-CONFERENCIAS = (FIXTURES / "conferencia.json", FIXTURES / "conferencia_extra.json")
+CONFERENCIAS = (FIXTURES / "conferencia.json", FIXTURES / "conferencia_extra.json", FIXTURES / "campos_teste.json")  # o teste já usado também não volta
 
 
 def periodo_curto(p):

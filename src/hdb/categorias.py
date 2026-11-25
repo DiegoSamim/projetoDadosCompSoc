@@ -41,14 +41,27 @@ DEFEITOS = (  # a negação ("sem vicios", "nao tem vicios") tira a ocorrência 
     "doente|enfermo|enferma|enfermidade",  # 6
     "aleijado|aleijada|coxo|coxa|manco|manca|cego|cega",  # 8
 )
-MARCAS_CORPO = (  # "marca" sozinha é verbo ("marcar" roupa), por isso só valem as formas abaixo
+_DENTE_DE = r"(?:(?:de|do|da|dos|das|um|hum|todos|os|as|alguns|uns|dous|dois|tres|varios|seus|nos|na|no)\s+){0,3}"
+_DINHEIRO = r"(?!\s*(?:de\s+)?(?:\d|\$|dinheiro|ouro|prata|reis|mil\b))(?!\W+(?:s[eo]\w*|abaixo|que|sao|\w*guint\w*)\b)(?!\W*\w{0,2}\W+gu\w)(?!\s*:)"  # "sinal de 20$000" é adiantamento; "signaes seguintes" é só título
+MARCAS_CORPO = (  # "marca" sozinha é verbo ("marcar" roupa), por isso só valem as formas abaixo; "~" abre uma regex
     "cicatriz|cicatrizes",  # 18
-    "signal|sinal|sinaes",  # 41
-    "bexigas|bexiguento|bexiguenta",  # 10
-    "falta de dentes|falto de dentes|falta de hum dente|falta de um dente|falta de dente|falta dos dentes",  # 16
-    "ferida|feridas",  # 13
-    "queimadura|queimaduras",  # 5
-    "marca=marca no|marca na|marca de|marca do|marca da|marcas|marcado no|marcado na|tem marca|tem huma marca|tem uma marca",
+    "signal=~\\b(?:signa[el]s?|signaes|sigua[eil]s?|sizna[el]s?|sign[sn]es|sinaes|sinais|sinal)\\b" + _DINHEIRO,  # 41, com OCR
+    "bexigas|bexiga|bexiguento|bexiguenta|bexigoso|bexigosa|bexigueiro",  # 10
+    "falta de dentes|falto de dentes|falta de hum dente|falta de um dente|falta de dente|falta dos dentes|desdentado|desdentada",  # 16
+    "dentes=~\\b(?:falta\\w*|falto|sem|quebrad\\w+)\\s+" + _DENTE_DE + "dentes?\\b"  # "sem dentes", "falta de todos os dentes"
+    "|\\bdentes?\\s+" + _DENTE_DE + "(?:\\w+\\s+)?(?:quebrad|faltan|falt[ao]|podre|limad|serrad|cahid|estragad|careado)\\w*",
+    "ferida|feridas|ferimento|chaga|chagas|ulcera|rotura|quebradura|hernia|lanho",
+    "queimadura|queimaduras|queimado|queimada",  # 5
+    "orelha=~\\borelh\\w{1,3}(?:\\s+\\w+)?\\s+furad\\w*|\\bfurad\\w*\\s+(?:na|nas|da|das)\\s+orelh",
+    "ferro no corpo=~\\b(?:argola|ferros?|gargalheira|golilha)\\b(?:[^a-z]+(?:de|ferro|um|hum|grosso|grande))*[^a-z]+(?:no|ao|do|de|nos|aos)[^a-z]+(?:pescoco|pes?|tornozelos?)\\b",
+    "olho=cego|cega|vesgo|vesga|zarolho|zarolha|caolho|torto de hum olho|torto de um olho|torto do olho|olho torto",
+    "coxo|manco|aleijado|aleijada",
+    "dedo=~\\bdedos?\\b[^.;]{0,25}\\b(?:falt|cortad|aleijad|torto|virad|paralit|quebrad|decepad|mutilad)"
+    "|\\b(?:falta\\w*|falto|aleijad\\w+|cortad\\w+|paralit\\w+|faltan\\w+)\\s+(?:(?:de|do|dos|um|hum|o|os)\\s+){0,2}(?:\\w+\\s+)?dedos?\\b",
+    "mancha|verruga|belida|pinta",
+    "risco no rosto=~\\b(?:risc[oa]s?)\\b(?=[^.;]{0,30}\\b(?:cara|rosto|testa|face)\\b)|\\b(?:cara|rosto|testa|face)\\b[^.;]{0,20}\\briscas?\\b",
+    "marca=marca no|marca na|marca de|marca do|marca da|marcas|marcado no|marcado na|marcado com|marcado a ferro|com a marca|com marca"
+    "|tem marca|tem a marca|tem huma marca|tem uma marca",
 )
 
 
@@ -57,6 +70,8 @@ def _canonica_e_variantes(item):
     nome, _, resto = item.partition("=")
     if not resto:
         nome, resto = item.split("|")[0], item
+    if resto.startswith("~"):  # regex sobre o texto sem acento
+        return nome, [re.compile(resto[1:])]
     return nome, [v.split() for v in resto.split("|")]
 
 
@@ -84,6 +99,11 @@ def ocorrencias(texto, lista, negacao=True):
     achadas = []
     for item in lista:
         canonica, variantes = _canonica_e_variantes(item)
+        if variantes and isinstance(variantes[0], re.Pattern):
+            for m in variantes[0].finditer(norm):
+                if not (negacao and _negado(norm, m.start())):
+                    achadas.append((canonica, m.start(), m.end()))
+            continue
         for palavras in variantes:
             n = len(palavras)
             for k in range(len(tokens) - n + 1):

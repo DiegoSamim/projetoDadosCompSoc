@@ -218,7 +218,7 @@ def formatar_resumo(r):
                       "Por tipo:", *grupo(r["por_tipo"]), *ocr])
 
 
-def processar(banco, versao_campos=config.VERSAO_CAMPOS, versao=config.VERSAO_CORPUS, lote=config.LOTE_CORPUS,
+def processar(banco, versao_campos=config.VERSAO_CAMPOS_CORPUS, versao=config.VERSAO_CORPUS, lote=config.LOTE_CORPUS,
               incluir_incertos=False):
     """Padroniza os anúncios selecionados e grava em lotes (regravar a mesma `versao` substitui:
     quem deixou de ser selecionado sai do corpus). Devolve o resumo.

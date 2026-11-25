@@ -318,8 +318,8 @@ def c4(texto, abertura):
     return extrair_anuncio({"texto": texto, "abertura": abertura})
 
 
-def test_versao_c6():  # c6: recompensa, nação e idade aceitam mais erros de OCR (ver `_recompensa`, `_nacoes`, `ANOS`)
-    assert VERSAO_CAMPOS == "c6"
+def test_versao_c7():  # c7: sexo com mais grafias (maleque, "humescravo"), "escravo fugido" e "cor preta"
+    assert VERSAO_CAMPOS == "c7"
 
 
 @pytest.mark.parametrize("texto,abertura", [
@@ -584,3 +584,21 @@ def test_nacao_citada_mesmo_desconhecida(texto, nacoes):
 def test_idade_com_ocr_sujo(texto, faixa):
     r = extrair(texto)
     assert (r["idade_min"], r["idade_max"]) == faixa
+
+
+# --- c7: sexo com o OCR sujo (trechos reais do conjunto de desenvolvimento) ---
+
+@pytest.mark.parametrize("texto,sexo", [
+    ("fugio hum maleque de idade 16 a 18 annos, por nome Francisco", "m"),
+    ("Falta, ha 10 dias, humescravo, por nome Paulo, Nação Congo", "m"),
+    ("o escravo Manoel Coreia, pardo escuro, sem dentes na frente", "m"),
+    ("ESCRAVO FUGIDO cozinheiro, magro e alto", "m"),
+    ("tem os seguintes: cór preta, 11 annos, altura regular", None),
+    ("Fugio, côr parda, idade 20 annos, altura regular", None),
+    ("a raça negra, rehabilitada pela liberdade, 20 annos", None),
+    ("VENDE-SE hum preto e huma preta", "ambos"),
+    ("Vende-se uma casa de pedra e cal, com palácio e jardim", None),
+    ("camisa preta de algodão e calça azul", None),
+])
+def test_sexo_c7(texto, sexo):
+    assert extrair(texto)["sexo"] == sexo
