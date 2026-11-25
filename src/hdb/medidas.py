@@ -36,12 +36,12 @@ def _ler_tudo(consulta, bloco=1000):
 
 
 def carregar(banco, config):
-    """DataFrame com um anúncio por linha: período curto, bib, campos, texto original e as parcelas de temas
+    """DataFrame com um anúncio por linha: ano, período curto, bib, campos, texto original e as parcelas de temas
     `p_fuga`, `p_servico`, `p_ama` (NaN onde o anúncio não tem mistura de temas no modelo da rodada)."""
     from hdb.topicos import nomear
     db = banco.cliente
     corpus = pd.DataFrame(banco.anuncios_do_corpus(config.VERSAO_CORPUS))
-    corpus = corpus[corpus["texto_padrao"].fillna("").str.strip() != ""][["id", "periodo_legal"]]
+    corpus = corpus[corpus["texto_padrao"].fillna("").str.strip() != ""][["id", "periodo_legal", "ano"]]
     extra = _ler_tudo(lambda: db.table("anuncios_completos")
                       .select("id,texto,bib,c_tipo,c_sexo,c_idade_min,c_idade_max,c_nacoes,c_recompensa")
                       .in_("versao", list(config.VERSOES_ANUNCIOS)).eq("c_versao", config.VERSAO_CAMPOS)
@@ -88,7 +88,7 @@ def _definicoes(df):
     alug = d[(d["c_tipo"] == "aluguel") & d["c_sexo"].isin(["f", "m"])]
 
     def base(sub, serie):
-        b = sub[["periodo", "bib", "w_aj"]].copy()
+        b = sub[["periodo", "bib", "w_aj"] + (["ano"] if "ano" in sub else [])].copy()
         b["v"] = serie.astype(float)
         return b.dropna(subset=["v"])
 

@@ -37,6 +37,8 @@ antes de olhar o resultado (a lista é fixa, são 9) e recebe um **veredito**.
 | **não sustentada** | o sentido muda entre as visões, ou contraria a frase, ou o intervalo da visão bruta contém zero, ou a visão ajustada de um tema não confirma |
 | **frágil** | mesmo na base alternativa, a base ou o último período têm menos de 30 anúncios em alguma visão |
 
+**Ano da mudança.** Só para as medidas de proporção 1, 2, 3, 5 e 6: ano estimado do degrau na série anual (visão bruta; entre parênteses, só JC); *sem ponto* = não se define (detalhes no caderno `pontos_de_mudanca`). Não altera o veredito, mas, se o ponto some na visão só JC, o motivo avisa "possível efeito de jornal".
+
 **Forma.** *Um degrau* = mais de 60% da mudança total acontece num só passo entre períodos vizinhos; senão, *gradual*.
 
 > **As afirmações 6 a 9 não são achados históricos.** A 6 mede a **mistura da amostra** (quantos anúncios de fuga a busca achou); as 7 a 9 são **temas, que acompanham o tipo do anúncio**.
@@ -66,6 +68,7 @@ from hdb import config
 from hdb.afirmacoes import AFIRMACOES, formatar, quadro
 from hdb.banco import BancoSupabase
 from hdb.medidas import MIN_N, PERIODOS, calcular, carregar
+from hdb.pontos_mudanca import calcular_pontos
 
 pd.set_option("display.width", 220)
 pd.set_option("display.max_columns", 30)
@@ -76,7 +79,7 @@ if len(df) != __N_COM__:
     print(f"ATENÇÃO: os comentários deste caderno foram escritos para __N_COM__ anúncios e agora são {len(df)}: "
           "confira os números dos textos antes de usar.")
 RESULTADOS = calcular(df)
-QUADRO = quadro(RESULTADOS)
+QUADRO = quadro(RESULTADOS, calcular_pontos(df))
 plt.rcParams.update({"figure.dpi": 110, "font.size": 9, "axes.spines.top": False, "axes.spines.right": False})
 ''')
 

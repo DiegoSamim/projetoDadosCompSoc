@@ -2,10 +2,10 @@
 
 Uso: python scripts/rodar_tudo.py [--rapido] [--sem-notebooks] [--so PASSO]
 
-Passos, em ordem: campos, corpus, corpus_i, topicos, topicos_i, estabilidade, relatorio, resumo, notebooks.
+Passos, em ordem: campos, corpus, corpus_i, topicos, topicos_i, estabilidade, consenso, relatorio, resumo, notebooks.
 O passo `resumo` escreve resumo_dados.md (scripts/resumo_dados.py). O passo `notebooks` gera e executa, nesta ordem:
 analise_descritiva (gerar_analise), topicos_por_periodo (gerar_topicos), equilibrio_periodos (gerar_equilibrio),
-mudanca_por_tipo (gerar_tipos), categorias_por_periodo (gerar_categorias), incerteza (gerar_incerteza), robustez_mistura (gerar_robustez), afirmacoes (gerar_afirmacoes), validacao_campos (gerar_validacao) e material_do_grupo (gerar_material).
+mudanca_por_tipo (gerar_tipos), categorias_por_periodo (gerar_categorias), incerteza (gerar_incerteza), robustez_mistura (gerar_robustez), afirmacoes (gerar_afirmacoes), pontos_de_mudanca (gerar_pontos), validacao_campos (gerar_validacao) e material_do_grupo (gerar_material).
 Cada um roda em um subprocesso (PYTHONPATH=src, mesmo Python). Para no primeiro erro e diz como retomar
 (`--so PASSO` roda só aquele). Grava tudo em data/rodar_tudo.log.
 """
@@ -26,7 +26,8 @@ CADERNOS = [("gerar_analise.py", "analise_descritiva"), ("gerar_topicos.py", "to
             ("gerar_equilibrio.py", "equilibrio_periodos"), ("gerar_tipos.py", "mudanca_por_tipo"),
             ("gerar_categorias.py", "categorias_por_periodo"), ("gerar_incerteza.py", "incerteza"),
             ("gerar_robustez.py", "robustez_mistura"),
-            ("gerar_afirmacoes.py", "afirmacoes"), ("gerar_validacao.py", "validacao_campos"),
+            ("gerar_afirmacoes.py", "afirmacoes"), ("gerar_pontos.py", "pontos_de_mudanca"),
+            ("gerar_validacao.py", "validacao_campos"),
             ("gerar_material.py", "material_do_grupo")]
 
 
@@ -47,6 +48,7 @@ def passos():
         ("topicos", [_hdb("topicos", "--topicos", "6", "--semente", "auto", "--versao", "t5")]),
         ("topicos_i", [_hdb("topicos", "--versao-corpus", "corp3i", "--topicos", "6", "--semente", "auto", "--versao", "t5i")]),
         ("estabilidade", [_script(RAIZ / "scripts" / "estabilidade_topicos.py")]),
+        ("consenso", [_script(RAIZ / "scripts" / "consenso_topicos.py")]),
         ("relatorio", [_hdb("relatorio")]),
         ("resumo", [_script(RAIZ / "scripts" / "resumo_dados.py")]),
         ("notebooks", [c for gerador, caderno in CADERNOS for c in (
@@ -63,7 +65,7 @@ def escolher(rapido=False, sem_notebooks=False, so=None):
         if so not in NOMES:
             raise SystemExit(f"erro: passo desconhecido {so!r}; os passos são: {', '.join(NOMES)}")
         return [p for p in todos if p[0] == so]  # --so ignora --rapido e --sem-notebooks
-    pulados = {"estabilidade"} if rapido else set()
+    pulados = {"estabilidade", "consenso"} if rapido else set()
     if sem_notebooks:
         pulados.add("notebooks")
     return [p for p in todos if p[0] not in pulados]
@@ -104,7 +106,7 @@ def rodar(selecionados, log=None):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--rapido", action="store_true", help="pula a estabilidade dos tópicos (demorada)")
+    ap.add_argument("--rapido", action="store_true", help="pula a estabilidade e o consenso dos tópicos (demorados)")
     ap.add_argument("--sem-notebooks", action="store_true", help="não gera nem executa os notebooks")
     ap.add_argument("--so", metavar="PASSO", help=f"roda só este passo ({', '.join(NOMES)})")
     args = ap.parse_args(argv)

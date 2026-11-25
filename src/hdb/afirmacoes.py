@@ -7,6 +7,7 @@ compara o último período com uma base (o primeiro período com n e n efetivo >
 import numpy as np
 
 from hdb.estatistica import fdr_bh
+from hdb.pontos_mudanca import texto_ponto
 from hdb.relatorio import num, tabela
 
 PERIODOS = ["antes de 1831", "1831–1850", "1850–1871", "1871–1888"]
@@ -75,8 +76,10 @@ def _zero(ic):
     return _nan(ic[1]) or _nan(ic[2]) or ic[1] <= 0 <= ic[2]
 
 
-def quadro(resultados):
-    """Lista de dicts, uma por afirmação, na ordem de AFIRMACOES."""
+def quadro(resultados, pontos=None):
+    """Lista de dicts, uma por afirmação, na ordem de AFIRMACOES.
+
+    `pontos` (opcional, de `pontos_mudanca.calcular_pontos`) preenche o ano da mudança; não altera o veredito."""
     pvals = [((resultados.get(i) or {}).get("tendencia", {}).get("bruta") or (float("nan"),))[0] for i, *_ in AFIRMACOES]
     padj = fdr_bh(pvals)
     linhas = []
@@ -97,8 +100,19 @@ def quadro(resultados):
             linha[f"n_ultimo_{v}"] = c[ULTIMO]["n"] if c.get(ULTIMO) else 0
         linha["forma"] = _forma(r.get("bruta") or {}, bases["bruta"]) if r else "—"
         linha["veredito"], linha["motivo"] = _veredito(r, visoes, bases, esperado, pa, i)
+        pt = (pontos or {}).get(i)
+        linha["ano_mudanca"] = _ano_mudanca(pt)
+        if pt and pt["bruta"].get("definido") and not pt["jc"].get("definido"):
+            linha["motivo"] += " Possível efeito de jornal: o ponto de mudança some na visão só JC."
         linhas.append(linha)
     return linhas
+
+
+def _ano_mudanca(pt):
+    """'1850 (1851)': ano bruto e, entre parênteses, o só JC; 'sem ponto' onde não há; '–' se a medida não tem série anual."""
+    if not pt:
+        return "–"
+    return f"{texto_ponto(pt['bruta'])} ({texto_ponto(pt['jc'])})"
 
 
 def _veredito(r, visoes, bases, esperado, padj, i):
@@ -164,12 +178,12 @@ def _par(l, v):
 def formatar(quadro_):
     """Tabela Markdown do quadro."""
     cab = ("#", "Afirmação", "Natureza", "Base", "Valor base → último (bruta)", "Valor base → último (só JC)",
-           "Diferença [IC 95%] (bruta / só JC / ajustada)", "p aj.", "Forma", "Veredito", "Motivo")
+           "Diferença [IC 95%] (bruta / só JC / ajustada)", "p aj.", "Forma", "Ano da mudança", "Veredito", "Motivo")
     linhas = []
     for l in quadro_:
         difs = [_dif(l["dif_bruta"], l["unidade"]), _dif(l["dif_jc"], l["unidade"])]
         if "dif_ajustada" in l:
             difs.append(_dif(l["dif_ajustada"], l["unidade"]))
         linhas.append((l["id"], l["texto"], l["natureza"], _base_txt(l), _par(l, "bruta"), _par(l, "jc"),
-                       " / ".join(difs) + ("" if l["unidade"] == "%" else l["unidade"]), _p(l["p_ajustado"]), l["forma"], f"**{l['veredito']}**", l["motivo"]))
+                       " / ".join(difs) + ("" if l["unidade"] == "%" else l["unidade"]), _p(l["p_ajustado"]), l["forma"], l["ano_mudanca"], f"**{l['veredito']}**", l["motivo"]))
     return tabela(cab, linhas)

@@ -71,6 +71,7 @@ def test_montar_sem_dados_nao_falha():
 def test_ler_com_banco_simulado(monkeypatch):
     monkeypatch.setattr(rd.medidas, "carregar", lambda banco, config: None)
     monkeypatch.setattr(rd.medidas, "calcular", lambda df: _quadro_resultados())
+    monkeypatch.setattr(rd.pontos_mudanca, "calcular_pontos", lambda df: {})
     class Consulta:
         def __init__(self, tabela, dados): self.t, self.d, self.ini = tabela, dados, 0
         def select(self, *a): return self

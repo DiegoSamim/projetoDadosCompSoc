@@ -281,6 +281,36 @@ período tem n < 30; **não sustenta** = o restante. "Não sustenta" não prova 
 """)
 md(COM.get("c3", "_(a preencher)_"))
 
+md("""
+## 6. Consenso entre sementes
+O bootstrap acima usa o modelo de temas **fixo**. Aqui medimos a outra fonte de incerteza: **o LDA depende da semente**.
+Treinamos o mesmo modelo (mesmo corpus, 6 temas, mesmos parâmetros) com 30 sementes fixas, emparelhamos cada rodada com a
+rodada de referência (método húngaro sobre a distância de Jensen–Shannon entre as distribuições de palavras) e olhamos:
+(a) em quantas sementes cada tema da referência reaparece (**estabilidade**; abaixo de 70% = **instável**) e (b) o intervalo
+(2,5–97,5% entre sementes) da **parcela do tema por período**. O limiar de "mesmo tema" é metade da mediana das distâncias
+entre temas distintos da referência. Nada é gravado no banco: o resumo vem de `data/consenso_topicos.json`.
+""")
+code('''
+import json
+arq = RAIZ / "data" / "consenso_topicos.json"
+if not arq.exists():
+    display(Markdown("**Aviso:** `data/consenso_topicos.json` não existe. Rode `python scripts/consenso_topicos.py` e gere o caderno de novo."))
+else:
+    C = json.loads(arq.read_text(encoding="utf-8"))
+    print(f"{C['n_anuncios']} anúncios, {C['n_sementes']} sementes, semente de referência {C['semente_ref']}; "
+          f"limiar JS = {C['limiar']:.3f}; instável se estabilidade < {C['min_estavel']:.0%}")
+    est = pd.DataFrame([{"Tema (referência)": t["nome"], "Palavras": ", ".join(t["palavras"][:6]),
+                         "Estabilidade": f"{t['estabilidade']:.0%}", "Distância mediana": round(t["dist_mediana"], 3),
+                         "Situação": "instável" if t["instavel"] else "estável"} for t in C["temas"]]).set_index("Tema (referência)")
+    display(est)
+    ps = C["periodos"]
+    lin = [{"Tema": t["nome"], **{p: f"{t['parcela'][p]['mediana']:.1%} [{t['parcela'][p]['p2_5']:.1%}; {t['parcela'][p]['p97_5']:.1%}]" for p in ps}}
+           for t in C["temas"]]
+    display(Markdown("Parcela do tema por período: **mediana [2,5%; 97,5%]** entre as sementes (tema emparelhado à referência)."))
+    display(pd.DataFrame(lin).set_index("Tema"))
+''')
+com("c_consenso")
+
 for _c in cells:  # nº de anúncios para o qual os comentários foram escritos (a chave "_n_anuncios" do JSON)
     if _c.cell_type == "code":
         _c.source = _c.source.replace("__N_COM__", str(COM.get("_n_anuncios", 0)))

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 ARQUIVO = Path(__file__).resolve().parents[1] / "scripts" / "rodar_tudo.py"
-ORDEM = ["campos", "corpus", "corpus_i", "topicos", "topicos_i", "estabilidade", "relatorio", "resumo", "notebooks"]
+ORDEM = ["campos", "corpus", "corpus_i", "topicos", "topicos_i", "estabilidade", "consenso", "relatorio", "resumo", "notebooks"]
 
 
 @pytest.fixture
@@ -36,10 +36,11 @@ def nomes(rt, **kw):
 
 def test_ordem_e_flags(rt):
     assert nomes(rt) == ORDEM
-    assert "estabilidade" not in nomes(rt, rapido=True)
+    assert "estabilidade" not in nomes(rt, rapido=True) and "consenso" not in nomes(rt, rapido=True)
     assert nomes(rt, sem_notebooks=True) == ORDEM[:-1]
     assert nomes(rt, so="topicos_i") == ["topicos_i"]
     assert nomes(rt, so="estabilidade", rapido=True) == ["estabilidade"]
+    assert nomes(rt, so="consenso", rapido=True) == ["consenso"]
     with pytest.raises(SystemExit):
         rt.escolher(so="xyz")
 
@@ -82,6 +83,7 @@ def test_notebooks_geram_e_executam_na_ordem(rt, monkeypatch):
                 ("gerar_incerteza.py", None), ("executar_notebook.py", "incerteza"),
                 ("gerar_robustez.py", None), ("executar_notebook.py", "robustez_mistura"),
                 ("gerar_afirmacoes.py", None), ("executar_notebook.py", "afirmacoes"),
+                ("gerar_pontos.py", None), ("executar_notebook.py", "pontos_de_mudanca"),
                 ("gerar_validacao.py", None), ("executar_notebook.py", "validacao_campos"),
                 ("gerar_material.py", None), ("executar_notebook.py", "material_do_grupo")]
     assert [(Path(c[1]).name, Path(c[2]).stem if len(c) > 2 else None) for c in chamados] == esperado

@@ -14,7 +14,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(RAIZ / "src"))
 
-from hdb import afirmacoes, config, medidas
+from hdb import afirmacoes, config, medidas, pontos_mudanca
 from hdb.relatorio import num, tabela
 
 SAIDA = RAIZ / "resumo_dados.md"
@@ -75,7 +75,8 @@ def ler(banco):
     for p in _todas(cli.table("paginas").select("id,bib,ano").eq("status", "ok").order("id")):
         if p.get("ano"):
             paginas[(nomes.get(p["bib"]) or p["bib"], p["ano"])] += 1
-    quadro = afirmacoes.quadro(medidas.calcular(medidas.carregar(banco, config)))   # ~30 s: bootstrap das 9 medidas
+    df = medidas.carregar(banco, config)
+    quadro = afirmacoes.quadro(medidas.calcular(df), pontos_mudanca.calcular_pontos(df))   # ~1 min: bootstrap das 9 medidas e dos pontos
     return {
         "gerado_em": datetime.now().strftime("%Y-%m-%d"),
         "versoes": {"campos": config.VERSAO_CAMPOS, "corpus": config.VERSAO_CORPUS, "topicos": config.VERSAO_TOPICOS},
@@ -150,6 +151,7 @@ def _quadro(dados):
             "mistura de tipos igualada). **Sustentada** = a mudança é real em todas as visões; **parcial** = mesmo sentido, mas "
             "o intervalo inclui zero em alguma; **não sustentada** = o sentido muda ou contraria a frase; **frágil** = poucos "
             "anúncios. As afirmações 6 a 9 descrevem a amostra (mistura de tipos e temas), não achados históricos. "
+            "**Ano da mudança** = ano estimado do degrau (entre parênteses, só JC; \"sem ponto\" = a data não se define; só as medidas 1, 2, 3, 5 e 6 têm série anual; caderno `pontos_de_mudanca`). "
             "Detalhes no caderno `afirmacoes`.\n\n" + afirmacoes.formatar(q)
             + "\n\n**Ressalva de leitura (caderno `validacao_campos`).** Os campos são extraídos do texto por regras, e o código perde parte deles "
             "(no conjunto de teste, acha 77% das recompensas, 100% das nações citadas e 86% das idades). Conferido à mão (35 fugas por "
