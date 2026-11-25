@@ -36,6 +36,8 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 
 ### Rodada de 25/11
 
+**Coleta rápida de 25/11:** 1887 entrou (14 páginas, 33 anúncios de pessoas, todos de fuga); **1888 continua sem nenhuma página** (as seis frases de fuga listadas terminam em 1887; não sabemos se 1888 está fora do acervo digitalizado). A captura ganhou `--ano-min`. O complemento segue em 69 de 91 páginas.
+
 | Item | Situação |
 |---|---|
 | Bloqueio do site | **Feito.** A ferramenta espera quando o site pede, para depois de 3 respostas de bloqueio seguidas e não marca página como erro. `hdb buscar`, `amostra.py` e `capturar` param com a mensagem "tente de novo mais tarde" (código de saída 2). |

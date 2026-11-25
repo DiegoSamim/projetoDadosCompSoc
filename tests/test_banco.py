@@ -426,3 +426,16 @@ def test_espera_crescente_entre_as_tentativas(monkeypatch):
     b._espera = modulo_banco.ESPERAS
     b._rpc("f")
     assert dormiu == [1, 3]
+
+
+def test_paginas_antes_do_ano_serve_de_excluir_na_reserva():
+    b = BancoMemoria()
+    for i, ano in enumerate([1880, 1884, 1886, 1887, 1888], start=1):
+        b.registrar_ocorrencia({"bib": "364568_07", "acervo": "x", "termo": "t", "ocorrencia": i, "total_ocorrencias": 5,
+                                "ano": str(ano), "edicao": "1", "pagina": "1", "pagina_fisica": str(i), "link": "l"})
+    antes = b.paginas_antes_do_ano("364568_07", 1886)
+    assert antes == [1, 2]
+    b.paginas[1]["status"] = "ok"  # já capturada não é "por capturar"
+    assert b.paginas_antes_do_ano("364568_07", 1886) == [2]
+    reservadas = b.reservar("ana", 10, bib="364568_07", termo="t", excluir=antes)
+    assert sorted(p["ano"] for p in reservadas) == [1886, 1887, 1888]

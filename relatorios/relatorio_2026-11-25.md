@@ -1,6 +1,6 @@
 # Relatório metodológico da coleta
 
-Gerado em 25/11/2026 05:22. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
+Gerado em 25/11/2026 19:20. Fonte: Hemeroteca Digital Brasileira, https://memoria.bn.gov.br.
 
 ## 1. Regras da busca da HDB
 
@@ -52,9 +52,11 @@ Para cada termo e acervo: quantas ocorrências a HDB informa, quantas foram list
 | `"escravo fugido"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 1.121 | 942 | 32 | 7 | 23/11/2026 23:02 | 24/11/2026 14:50 |
 | `"escravos fugidos"` | 364568_01 | Jornal do Commercio (RJ) - 1827 a 1829 | 167 | 167 | 4 | 0 | 20/11/2026 16:58 | 20/11/2026 17:06 |
 | `"escravos fugidos"` | 364568_02 | Jornal do Commercio (RJ) - 1830 a 1839 | 345 | 200 | 4 | 0 | 20/11/2026 17:08 | 20/11/2026 17:17 |
+| `"fugio a escrava"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 33 | 33 | 2 | 0 | 25/11/2026 14:33 | 25/11/2026 14:35 |
 | `"fugio o escravo"` | 364568_03 | Jornal do Commercio (RJ) - 1840 a 1849 | 54 | 54 | 8 | 0 | 24/11/2026 00:34 | 24/11/2026 00:36 |
 | `"fugio o escravo"` | 364568_05 | Jornal do Commercio (RJ) - 1860 a 1869 | 101 | 101 | 4 | 0 | 20/11/2026 17:31 | 20/11/2026 17:37 |
 | `"fugio o escravo"` | 364568_06 | Jornal do Commercio (RJ) - 1870 a 1879 | 111 | 111 | 5 | 0 | 20/11/2026 18:02 | 20/11/2026 18:08 |
+| `"fugio o escravo"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 73 | 73 | 7 | 0 | 25/11/2026 14:24 | 25/11/2026 14:28 |
 | `"fugio o preto"` | 364568_03 | Jornal do Commercio (RJ) - 1840 a 1849 | 88 | 60 | 6 | 0 | 24/11/2026 00:31 | 24/11/2026 00:34 |
 | `"fugio um escravo"` | 094170_01 | Diário do Rio de Janeiro (RJ) - 1821 a 1858 | 179 | 60 | 5 | 0 | 23/11/2026 23:36 | 23/11/2026 23:40 |
 | `"preta com leite"` | 094170_01 | Diário do Rio de Janeiro (RJ) - 1821 a 1858 | 252 | 60 | 5 | 0 | 23/11/2026 23:32 | 23/11/2026 23:36 |
@@ -67,6 +69,7 @@ Para cada termo e acervo: quantas ocorrências a HDB informa, quantas foram list
 | `"preta fugida"` | 364568_06 | Jornal do Commercio (RJ) - 1870 a 1879 | 213 | 60 | 6 | 2 | 24/11/2026 00:28 | 24/11/2026 00:31 |
 | `"preto fugido"` | 364568_04 | Jornal do Commercio (RJ) - 1850 a 1859 | 184 | 60 | 9 | 4 | 24/11/2026 00:15 | 24/11/2026 00:17 |
 | `"preto fugido"` | 364568_05 | Jornal do Commercio (RJ) - 1860 a 1869 | 212 | 60 | 4 | 4 | 24/11/2026 00:23 | 24/11/2026 00:26 |
+| `"preto fugido"` | 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 112 | 112 | 7 | 1 | 25/11/2026 14:28 | 25/11/2026 14:33 |
 | `"vende-se um preto"` | 094170_01 | Diário do Rio de Janeiro (RJ) - 1821 a 1858 | 575 | 60 | 4 | 0 | 23/11/2026 23:20 | 23/11/2026 23:25 |
 | `"vende-se uma crioula"` | 364568_05 | Jornal do Commercio (RJ) - 1860 a 1869 | 31 | 31 | 0 | 5 | 24/11/2026 00:49 | 24/11/2026 00:51 |
 | `"vende-se uma parda"` | 364568_04 | Jornal do Commercio (RJ) - 1850 a 1859 | 62 | 60 | 4 | 2 | 24/11/2026 00:46 | 24/11/2026 00:49 |
@@ -83,11 +86,11 @@ Para cada termo e acervo: quantas ocorrências a HDB informa, quantas foram list
 
 ## 3. Captura
 
-Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 285 páginas ok, 59 CAPTCHAs (4,8 páginas por CAPTCHA).
+Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 299 páginas ok, 60 CAPTCHAs (5,0 páginas por CAPTCHA).
 
 | Quem | Páginas ok | CAPTCHAs | Erros por etapa | Segundos médios | Período |
 |---|---|---|---|---|---|
-| diego | 215 | 44 | captura: 24, ocr: 1 | 66,1 | 10/11/2026 15:09 a 25/11/2026 02:17 |
+| diego | 229 | 45 | captura: 25, ocr: 1 | 66,8 | 10/11/2026 15:09 a 25/11/2026 19:08 |
 | ifuaslaerl | 20 | 6 | captura: 21 | 67,0 | 23/11/2026 23:23 a 24/11/2026 13:24 |
 | joaogaletti | 49 | 9 | captura: 2 | 63,1 | 20/11/2026 21:13 a 23/11/2026 11:05 |
 | reprocessar-cinza | 1 | 0 | – | 58,3 | 11/11/2026 13:42 a 11/11/2026 13:42 |
@@ -98,7 +101,7 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 285 págin
 |---|---|---|
 | tesseract-4.1.1 por psm3-pagina-cinza | 49 | 73,4 |
 | tesseract-5.3.4 por psm3-pagina | 38 | 66,5 |
-| tesseract-5.3.4 por psm3-pagina-cinza | 214 | 71,5 |
+| tesseract-5.3.4 por psm3-pagina-cinza | 228 | 71,0 |
 | tesseract-5.3.4 por psm3-pagina-cinza-4500 | 2 | 72,9 |
 | tesseract-5.5.4 por psm3-pagina-cinza | 20 | 65,3 |
 
@@ -111,7 +114,7 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 285 págin
 | 364568_04 | Jornal do Commercio (RJ) - 1850 a 1859 | 49 | 73,2 |
 | 364568_05 | Jornal do Commercio (RJ) - 1860 a 1869 | 51 | 63,4 |
 | 364568_06 | Jornal do Commercio (RJ) - 1870 a 1879 | 44 | 64,4 |
-| 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 38 | 66,0 |
+| 364568_07 | Jornal do Commercio (RJ) - 1880 a 1889 | 52 | 65,4 |
 | 706744 | Imperio do Brasil: Diario Fluminense (RJ) - 1825 a 1831 | 5 | 82,6 |
 
 ## 5. Anúncios e campos
@@ -119,7 +122,7 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 285 págin
 | Versão da separação | Anúncios | Largos (cruzam colunas) | Páginas |
 |---|---|---|---|
 | v1 | 3.958 | 159 | 39 |
-| v2 | 31.769 | 388 | 236 |
+| v2 | 34.061 | 449 | 250 |
 | v2t | 632 | 0 | 33 |
 
 ### Campos, versão c1
@@ -160,12 +163,12 @@ Uma pessoa resolve cada CAPTCHA; a ferramenta não o contorna. Total: 285 págin
 
 ### Campos, versão c5
 
-32.401 anúncios.
+34.693 anúncios.
 
-- Tipo: outro: 29.874, aluguel: 896, venda: 637, fuga: 525, ama_de_leite: 237, aluguel_incerto: 189, compra: 43
-- Sexo: (sem sexo): 28.277, f: 2.072, m: 1.742, ambos: 310
-- Com idade: 847; com nome: 323; com recompensa: 521
-- Nações mais comuns: Mina (74), Angola (61), Benguela (58), Moçambique (50), Cabinda (48), Congo (32), Moange (13), Inhambane (8), Monjolo (7), Rebolo (7)
+- Tipo: outro: 32.133, aluguel: 902, venda: 638, fuga: 540, ama_de_leite: 240, aluguel_incerto: 197, compra: 43
+- Sexo: (sem sexo): 30.517, f: 2.103, m: 1.763, ambos: 310
+- Com idade: 855; com nome: 326; com recompensa: 542
+- Nações mais comuns: Mina (77), Angola (61), Benguela (58), Moçambique (50), Cabinda (48), Congo (33), Moange (14), Inhambane (8), Monjolo (7), Rebolo (7)
 
 ## 6. Panorama de acervos
 

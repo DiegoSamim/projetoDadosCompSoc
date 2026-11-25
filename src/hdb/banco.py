@@ -193,6 +193,15 @@ class BancoSupabase:
              "posicao": int(linha["ocorrencia"]), "total": _int(linha.get("total_ocorrencias"))},
             on_conflict="bib,termo,posicao", ignore_duplicates=True).execute()
 
+    def paginas_antes_do_ano(self, bib, ano):
+        """Ids das páginas ainda por capturar (pendentes ou com erro) de `bib` com ano anterior a `ano`.
+
+        Servem de `excluir` na reserva: assim a captura pede só os anos de `ano` em diante, sem filtro novo no SQL."""
+        consulta = self.cliente.table("paginas").select("id").lt("ano", int(ano)).in_("status", ["pendente", "erro"])
+        if bib:
+            consulta = consulta.eq("bib", str(bib))
+        return [l["id"] for l in _todas(consulta.order("id"))]
+
     def paginas_por_ano(self, bib, termo):
         """{ano: {"ok": n, "total": n}} das páginas listadas dessa busca (ano None fica de fora)."""
         linhas = _todas(self.cliente.table("ocorrencias").select("id,pagina_id,paginas(ano,status)")
@@ -446,6 +455,11 @@ class BancoMemoria:
 
     def contar_ocorrencias(self, bib, termo):
         return sum(1 for b, t, _ in self.ocorrencias if b == str(bib) and t == termo)
+
+    def paginas_antes_do_ano(self, bib, ano):
+        return sorted(p["id"] for p in self.paginas.values()
+                      if (not bib or p["bib"] == str(bib)) and p["ano"] is not None and int(p["ano"]) < int(ano)
+                      and p["status"] in ("pendente", "erro"))
 
     def paginas_por_ano(self, bib, termo):
         ids = {o["pagina_id"] for o in self.ocorrencias.values() if o["bib"] == str(bib) and o["termo"] == termo}

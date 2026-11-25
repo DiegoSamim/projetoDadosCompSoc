@@ -29,8 +29,8 @@ REFERENCIAS = {
     "Fuga: nome, idade e dono": {"anos", "dia", "escravo", "idade", "tiver", "nome", "contra", "souber", "dias", "cor"},
     "Fuga: roupa levada e nação": {"levou", "nacao", "fugiu", "levar", "sera", "corrente", "dia", "preto"},
     "Ama de leite": {"leite", "ama", "meses", "carinhosa", "parto", "criancas", "parda"},
-    "Serviço doméstico (aluguel)": {"aluga", "lava", "cozinha", "engoma", "servico", "todo", "faz", "precisa"},
-    "Venda de mulheres (lavar, engomar, cozinhar)": {"vende", "lavar", "engomar", "cozinhar", "sabe", "idade", "anos", "preta", "bonita"},
+    "Aluguel de pretos e moleques para todo o serviço": {"aluga", "todo", "servico", "moleque", "pretas", "alugao", "duas", "dois", "precisa", "alugar"},
+    "Mulheres: lavar, engomar, cozinhar (aluguel e venda)": {"lava", "lavar", "cozinha", "cozinhar", "engoma", "engomar", "sabe", "preta", "faz", "bem"},
     "Venda de moleques e pretos (lotes)": {"moleque", "pretos", "dois", "vendem", "escravos", "qualquer", "sendo", "idade"},
     "Venda com preço e qualidades": {"preco", "perfeito", "bonita", "pardo", "forno", "bem", "todo", "servico", "vende"},
 }

@@ -109,8 +109,15 @@ COMPLEMENTO = [
 
 # Cobertura: a meta é o TOTAL de páginas ok da busca (as que já existem contam), e as novas saem equilibradas por ano.
 # 1880s: a lista sai em ordem de data e só havia ~5 páginas de 1880; os outros anos da década ficaram de fora.
+# 2ª rodada (25/11): faltam 1887 e 1888 (nem estavam listados). A lista do site anda uma ocorrência por vez, em ordem de data,
+# então só frases PEQUENAS chegam ao fim da década depressa (73, 112 e 33 ocorrências no JC dos anos 1880, ~7 min no total;
+# "escravo fugido" tem 1.121 e "escrava fugida" 444). `ANO_MIN_COBERTURA` tira da reserva as páginas de anos anteriores,
+# e a meta é o total de páginas ok da busca (hoje 0 nessas frases): ~15 páginas novas, ~15 min de captura.
+ANO_MIN_COBERTURA = 1887
 COBERTURA = [
-    ("1871–1888",     "fuga",         "364568_07", "JC 1880s",   '"escravo fugido"',      20),
+    ("1871–1888",     "fuga",         "364568_07", "JC 1880s",   '"fugio o escravo"',      8),
+    ("1871–1888",     "fuga",         "364568_07", "JC 1880s",   '"preto fugido"',         4),
+    ("1871–1888",     "fuga",         "364568_07", "JC 1880s",   '"fugio a escrava"',      3),
 ]
 
 # quem fica com cada período (planejamento.md, "Quem faz o quê")
@@ -179,7 +186,8 @@ def capturar(banco, quem, modo, pessoa=None, extras=False, complemento=False, co
         print(f"\n== {periodo} · {tipo} · {acervo} · {termo}: faltam {falta} páginas", flush=True)
         # as imagens ficam em data/amostra porque `hdb anuncios` ainda precisa delas (planejamento, 3.1)
         bloqueado = capturar_paginas(banco, quem, bib=bib, termo=termo, max_paginas=falta, aleatorio=True,
-                                     modo=modo, guardar=config.AMOSTRA_DIR, equilibrar=cobertura or complemento)
+                                     modo=modo, guardar=config.AMOSTRA_DIR, equilibrar=cobertura or complemento,
+                                     ano_min=ANO_MIN_COBERTURA if cobertura else None)
         if bloqueado:
             print("\nO site da BN está pedindo para esperar; as páginas voltaram para a fila. "
                   "Tente de novo mais tarde.")

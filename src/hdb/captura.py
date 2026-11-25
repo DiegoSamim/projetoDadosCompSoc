@@ -60,15 +60,15 @@ def _guardar_ou_apagar(caminho, guardar):
         Path(caminho).unlink(missing_ok=True)
 
 
-def _paginas_reservadas(banco, quem, max_paginas, tentadas, **filtros):
+def _paginas_reservadas(banco, quem, max_paginas, tentadas, excluir_fixos=(), **filtros):
     """Páginas reservadas em lotes de `LOTE_RESERVA`, até `max_paginas` ou acabar a fila.
 
     Os ids vão para `tentadas`, que o banco exclui do lote seguinte (página que falhou
-    nesta execução não volta). Reservar aos poucos evita a reserva expirar no fim de uma execução longa.
+    nesta execução não volta); `excluir_fixos` são ids que nunca entram (ex.: anos anteriores a `ano_min`). Reservar aos poucos evita a reserva expirar no fim de uma execução longa.
     """
     while len(tentadas) < max_paginas:
         lote = banco.reservar(quem, min(config.LOTE_RESERVA, max_paginas - len(tentadas)),
-                              excluir=tentadas, **filtros)
+                              excluir=[*tentadas, *excluir_fixos], **filtros)
         if not lote:
             return
         for pagina in lote:
@@ -335,10 +335,11 @@ def _resumo(contagem, captchas):
 
 def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, aleatorio=False,
              modo="terminal", tamanho=config.TAMANHO_HIRES, workers=config.OCR_WORKERS, guardar=None,
-             segmentar=True, equilibrar=False):
+             segmentar=True, equilibrar=False, ano_min=None):
     """Reserva páginas do banco (até `max_paginas`, em lotes), captura (uma pessoa resolve o CAPTCHA) e faz o OCR.
 
     Com `equilibrar`, as páginas saem uma de cada ano por rodada (sorteadas dentro do ano).
+    Com `ano_min`, só entram páginas desse ano em diante (as de antes ficam de fora da reserva).
     Com `segmentar`, cada página gravada também tem as palavras e os anúncios gravados (sem derrubar a página se falhar).
     Se a imagem não aparece e o site responde 429/503, a captura encerra sem registrar erro na página (a reserva é
     devolvida no `finally`, por `banco.liberar_reservas`) e a função devolve True (bloqueado)."""
@@ -355,8 +356,9 @@ def capturar(banco, quem, bib=None, termo=None, max_paginas=config.MAX_PAGINAS, 
         _processar_orfas(banco, quem, executor, pendentes, segmentar)
         # Termina as órfãs antes de reservar: senão a mesma página (ainda pendente) seria capturada de novo.
         _gravar_prontos(banco, quem, pendentes, contagem, guardar, esperar=True)
-        fila = _paginas_reservadas(banco, quem, max_paginas, [], bib=bib, termo=termo, aleatorio=aleatorio,
-                                 equilibrar=equilibrar)
+        fixos = banco.paginas_antes_do_ano(bib, ano_min) if ano_min else []
+        fila = _paginas_reservadas(banco, quem, max_paginas, [], excluir_fixos=fixos, bib=bib, termo=termo,
+                                 aleatorio=aleatorio, equilibrar=equilibrar)
         primeira = next(fila, None)
         if primeira is None:
             print("Nenhuma página disponível para capturar.")

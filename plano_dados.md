@@ -47,6 +47,14 @@ Hoje, quando o site manda esperar, a ferramenta insiste, e cada página que falh
 - **Tempo:** ~1 h. Não depende do site.
 - **Feito:** a espera segue o `Retry-After` do site (ou uma espera que dobra a cada bloqueio, com teto de 15 minutos). Depois de 3 respostas de bloqueio seguidas, a ferramenta para com a mensagem "tente de novo mais tarde" e código de saída 2. Na captura, a página que volta para a fila não ganha erro nem perde tentativa. Nas listagens longas, a pausa passa de 1,5 para 3 segundos depois de 200 passos. Há testes automáticos para a espera, a parada e a captura que não marca erro.
 
+### Resultado da coleta rápida de 25/11 (itens 1.2 a 1.4)
+**Feito em cerca de 30 minutos, só o essencial.** O site voltou; a lista de "escravo fugido" (1.121 ocorrências) levaria mais de 1 hora, então listamos **seis frases pequenas de fuga** no JC dos anos 1880 (73, 112, 33, 14, 7 e 3 ocorrências) e capturamos as de 1887 em diante.
+- **1887 entrou:** 14 páginas capturadas, 33 anúncios de pessoas (6 de "fugio o escravo", 6 de "preto fugido", 2 de "fugio a escrava").
+- **1888 continua sem nenhuma página.** Nas seis frases (245 ocorrências) o último ano é 1887. Uma busca por frases de 1888 ("lei áurea", "13 de maio de 1888") foi inconclusiva, porque a lista sai em ordem de data e só se vê o começo. **Não sabemos se 1888 está fora do acervo digitalizado ou se essas frases não ocorrem nele.** A Lei Áurea fica sem descrição direta.
+- **Atenção:** os 33 anúncios de 1887 vêm só de frases de fuga; o resto de 1871–1888 tem aluguel e venda. O último período fica mais voltado à fuga.
+- **Ferramenta:** a captura ganhou `--ano-min` (via `scripts/amostra.py`, constante `ANO_MIN_COBERTURA`), que tira da reserva as páginas de anos anteriores; a cobertura usa agora essas seis frases.
+- **O complemento ficou em 69 de 91 páginas** (as 22 restantes são opcionais).
+
 ### 1.2 Ver se o site liberou (Diego)
 - Abrir no navegador: https://memoria.bn.gov.br/docreader/docreader.aspx?bib=364568_07&Pesq=%22escravo%20fugido%22
 - Se a página abrir, avisar o Claude. Se não abrir, esperar mais um dia.

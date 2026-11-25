@@ -4,28 +4,28 @@ Gerado em 2026-11-25 a partir do banco. Versões: campos `c5`, corpus `corp3`, t
 
 ## Anúncios por período e tipo
 
-32.401 textos separados nas páginas, dos quais 2.527 são anúncios de pessoas (os demais, tipo `outro`, são casas, notícias, mercadorias etc.).
+34.693 textos separados nas páginas, dos quais 2.560 são anúncios de pessoas (os demais, tipo `outro`, são casas, notícias, mercadorias etc.).
 
 | Período | aluguel | venda | fuga | ama_de_leite | aluguel_incerto | compra | outro | Total |
 |---|---|---|---|---|---|---|---|---|
 | antes de 1831 | 18 | 43 | 80 | 26 | 1 | 0 | 645 | 813 |
 | 1831–1850 | 163 | 211 | 123 | 73 | 17 | 19 | 2.348 | 2.954 |
 | 1850–1871 | 520 | 295 | 212 | 111 | 90 | 19 | 14.334 | 15.581 |
-| 1871–1888 | 195 | 88 | 110 | 27 | 81 | 5 | 12.547 | 13.053 |
-| **Total** | 896 | 637 | 525 | 237 | 189 | 43 | 29.874 | 32.401 |
+| 1871–1888 | 201 | 89 | 125 | 30 | 89 | 5 | 14.806 | 15.345 |
+| **Total** | 902 | 638 | 540 | 240 | 197 | 43 | 32.133 | 34.693 |
 
 ## Os temas e o peso de cada um por período
 
 Proporção média do tema nos anúncios de cada período.
 
-| Tema | Nome sugerido | Palavras principais | antes de 1831 (n = 152) | 1831–1850 (n = 565) | 1850–1871 (n = 1.085) | 1871–1888 (n = 365) |
+| Tema | Nome sugerido | Palavras principais | antes de 1831 (n = 152) | 1831–1850 (n = 565) | 1850–1871 (n = 1.085) | 1871–1888 (n = 389) |
 |---|---|---|---|---|---|---|
-| T0 | Venda com preço e qualidades | vende, preto, anos, bom, cozinheiro | 13,6% | 28,0% | 25,1% | 23,2% |
-| T1 | Ama de leite | aluga, leite, ama, preta, servico | 21,3% | 16,8% | 19,7% | 17,2% |
-| T2 | Serviço doméstico (aluguel) | aluga, preta, lava, servico, cozinha | 9,4% | 18,1% | 26,8% | 26,7% |
-| T3 | Fuga: roupa levada e nação | dia, nome, fugiu, anos, sera | 11,3% | 11,1% | 11,8% | 16,0% |
-| T4 | Venda de moleques e pretos (lotes) | dois, vende, escravos, preta, pretos | 10,5% | 13,6% | 8,5% | 10,7% |
-| T5 | Fuga: nome, idade e dono | nome, fugiu, nacao, dia, corrente | 34,0% | 12,3% | 8,1% | 6,2% |
+| T0 | Aluguel de pretos e moleques para todo o serviço | aluga, preto, servico, todo, pretas | 5,3% | 13,4% | 18,2% | 17,0% |
+| T1 | Fuga: nome, idade e dono | dia, nome, corrente, preto, fugiu | 14,9% | 9,4% | 8,6% | 9,8% |
+| T2 | Venda com preço e qualidades | vende, preto, anos, bom, cozinheiro | 8,3% | 22,5% | 18,6% | 20,7% |
+| T3 | Mulheres: lavar, engomar, cozinhar (aluguel e venda) | preta, aluga, lava, vende, lavar | 22,7% | 25,6% | 29,9% | 25,8% |
+| T4 | Fuga: roupa levada e nação | nome, fugiu, dia, escravo, nacao | 31,4% | 14,7% | 11,9% | 15,4% |
+| T5 | Ama de leite | leite, ama, aluga, boa, preta | 17,4% | 14,4% | 13,0% | 11,2% |
 
 > **Ressalva:** os temas acompanham o tipo do anúncio (fuga, venda, aluguel, ama de leite): uma mudança de tema por período pode ser só mudança na mistura de tipos da amostra. Os nomes são sugestões, o grupo ainda os confirma.
 
@@ -38,7 +38,7 @@ Proporção média do tema nos anúncios de cada período.
 | antes de 1831 | 80 | 52% |
 | 1831–1850 | 123 | 59% |
 | 1850–1871 | 212 | 30% |
-| 1871–1888 | 110 | 15% |
+| 1871–1888 | 125 | 17% |
 
 _Ressalva: períodos com poucos anúncios variam muito; a amostra vem de frases de busca._
 
@@ -46,11 +46,11 @@ _Ressalva: períodos com poucos anúncios variam muito; a amostra vem de frases 
 
 | Tipo | Anúncios | Feminino | Masculino | Sexo não aparece |
 |---|---|---|---|---|
-| aluguel | 896 | 63% | 37% | 0% |
-| venda | 637 | 49% | 51% | 0% |
-| fuga | 525 | 19% | 81% | 24% |
-| ama_de_leite | 237 | 98% | 2% | 1% |
-| aluguel_incerto | 189 | 87% | 13% | 0% |
+| aluguel | 902 | 63% | 37% | 0% |
+| venda | 638 | 48% | 52% | 0% |
+| fuga | 540 | 19% | 81% | 24% |
+| ama_de_leite | 240 | 98% | 2% | 1% |
+| aluguel_incerto | 197 | 87% | 13% | 0% |
 | compra | 43 | 43% | 57% | 0% |
 
 _Ressalva: o sexo vem de palavras do texto; "ama de leite" é feminino por construção._
@@ -71,7 +71,7 @@ _Ressalva: nação é o que o anunciante escreveu; muda de uso ao longo do sécu
 | Tipo | Com idade | Idade mediana (anos) |
 |---|---|---|
 | venda | 179 | 18,0 |
-| fuga | 126 | 22,0 |
+| fuga | 130 | 23,0 |
 | aluguel | 31 | 16,0 |
 | ama_de_leite | 26 | 19,0 |
 | aluguel_incerto | 10 | 12,0 |
@@ -93,9 +93,9 @@ _Ressalva: a idade é a que o anunciante disse (em geral aproximada)._
 | Jornal do Commercio (RJ) - 1850 a 1859 | 1850s | 49 | 8 de 10: 1850–1856, 1859 |
 | Jornal do Commercio (RJ) - 1860 a 1869 | 1860s | 51 | 10 de 10: 1860–1869 |
 | Jornal do Commercio (RJ) - 1870 a 1879 | 1870s | 44 | 10 de 10: 1870–1879 |
-| Jornal do Commercio (RJ) - 1880 a 1889 | 1880s | 38 | 7 de 10: 1880–1886 |
+| Jornal do Commercio (RJ) - 1880 a 1889 | 1880s | 52 | 8 de 10: 1880–1887 |
 
-**Anos sem nenhuma página lida (1821–1888), 8 de 68:** 1823, 1833, 1837, 1839, 1857, 1858, **1887**, **1888**.
+**Anos sem nenhuma página lida (1821–1888), 7 de 68:** 1823, 1833, 1837, 1839, 1857, 1858, **1888**.
 
 ## Os 3 limites principais
 
