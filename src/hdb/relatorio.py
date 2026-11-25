@@ -24,8 +24,8 @@ LIMITES = (
     "Mostra os anúncios que essas frases acham, então as proporções (tipo, sexo) não representam o jornal "
     "inteiro. A redação dos anúncios mudou com o tempo, e algumas frases deixam de existir depois de certa data.",
     "A listagem de cada busca vem em ordem de data, e só as primeiras páginas foram listadas. Por isso alguns "
-    "anos ficam sem páginas (ex.: no Jornal do Commercio de 1880–1889 há 1880, 1881 e 1885, e nada de 1886 a 1888; de 1850–1859 "
-    "só o de 1850).",
+    "anos ficam sem páginas (ex.: no Jornal do Commercio de 1880–1889 há páginas de 1880 a 1886, e nada de 1887 e 1888, porque "
+    "a listagem foi interrompida pelo servidor da BN antes de chegar a esses anos).",
     "Antes de 1831 a amostra vem sobretudo do Diário do Rio de Janeiro (1821) e do Diário Fluminense; os demais "
     "períodos vêm do Jornal do Commercio. Parte da diferença entre períodos pode ser diferença de jornal.",
     "Nos tipos aluguel, compra e venda, nem todo anúncio é de pessoa escravizada: \"criada\", \"rapariga\" e "

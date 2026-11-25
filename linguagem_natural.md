@@ -43,7 +43,7 @@ As etapas 1 a 4 são feitas pelo computador. As etapas 5 e 6 são trabalho de pe
 - confiança do OCR acima de um mínimo (por exemplo 50);
 - pelo menos umas 8 palavras (anúncios mais curtos são pedaços).
 
-**Retorno:** uma tabela com um anúncio por linha: texto, ano, período legal, tipo, sexo. Hoje são 655 anúncios no corpus (campos `c4`, corpus `corp2`). Com a amostra do grupo capturada, a estimativa é de algumas centenas a mais.
+**Retorno:** uma tabela com um anúncio por linha: texto, ano, período legal, tipo, sexo. O número atual de anúncios sai na saída do `hdb corpus` (versão `corp3`, sobre os campos `c5`) e muda a cada captura nova. As regras de tipo e de limpeza estão na seção "Regras de limpeza", mais abaixo.
 
 ### 2. Padronizar o texto
 
@@ -64,6 +64,8 @@ As etapas 1 a 4 são feitas pelo computador. As etapas 5 e 6 são trabalho de pe
 > **Padronizado:** fugiu molecote anos idade nacao benguela nome joaquim levando vestido camisa baeta amarela calcas lila preta bastante fugiu sabado corrente noticias
 
 Repare que `relinto` (um erro do OCR) sumiria ao filtrar palavras que não existem no vocabulário da época.
+
+**Erros da primeira letra.** Às vezes o OCR perde a primeira letra da palavra: `luga` no lugar de `aluga`, `ozinha` no lugar de `cozinha`. Essas correções são feitas sozinhas, mas só para as formas mais claras. As outras possíveis correções são apenas listadas, para o grupo revisar.
 
 ### 3. Transformar o texto em números
 
@@ -131,18 +133,34 @@ Com os tópicos nomeados, medimos quanto cada um pesa em cada período. A tabela
 
 Os campos já extraídos (sexo, idade) permitem fazer o mesmo **por gênero e idade**, por exemplo os tópicos dos anúncios de mulheres comparados com os de homens. Era um dos pedidos da reunião.
 
+## Regras de limpeza
+
+Antes de contar palavras, o computador decide **quais anúncios entram**. Estas regras foram mudadas em 25/11 (versões `c5` na classificação e `corp3` no corpus):
+
+| Problema | O que a ferramenta faz |
+|---|---|
+| Texto de navio, animal perdido, papel (cautela, bilhete), remédio ou propaganda que começa com "fugio" | Vira `outro` e fica fora do corpus. |
+| "Fuga" sem nenhum sinal de pessoa (palavra de pessoa, marca de escravizado, idade, nação, "de nome", sinal do corpo ou da roupa, dono) | Fica fora do modelo de tópicos (motivo `sem_pessoa`), mas continua no banco e nos gráficos descritivos. |
+| "Preto livre" escrito de forma explícita | Vira `outro`. |
+| Dois anúncios colados num pedaço só, com outra abertura (VENDE-SE, FUGIO…) no meio | Corta no início do outro anúncio e fica com o primeiro trecho que tem pessoa. O texto original não muda. |
+| Erro de OCR na primeira letra (`luga`→`aluga`, `ozinha`→`cozinha`) | Corrigido sozinho no corpus. |
+
+**A variante `corp3i`.** Existe também uma versão do corpus que inclui os anúncios de aluguel sem marca de escravizado (`aluguel_incerto`, como "criada"). Ela serve **só para comparar**: mostra se a conclusão muda quando esses anúncios entram. O corpus principal (`corp3`) continua sem eles. Os tópicos dessa versão são os `t5i`.
+
+**Como sabemos que as regras funcionam.** A conferência foi feita por Claude, não pelo grupo: 120 anúncios sorteados do corpus antigo (`tests/fixtures/conferencia.json`) e 40 numa segunda amostra (`conferencia_extra.json`). O grupo pode refazer a conferência com os mesmos arquivos, pelo `scripts/avaliar_limpeza.py`.
+
 ## Como está na ferramenta
 
 Segue o padrão dos outros comandos: tudo lido e gravado no banco, sem exportar arquivos.
 
 | Comando | Entra | Sai |
 |---|---|---|
-| `hdb corpus` (versão `corp2`) | anúncios com campos (versão `c4`) | texto padronizado de cada anúncio, gravado ao lado do original |
-| `hdb topicos --topicos 6 --versao t3` | o corpus | tópicos (palavras e pesos) e a mistura de tópicos de cada anúncio, gravados com o nome da versão |
+| `hdb corpus` (versão `corp3`) | anúncios com campos (versão `c5`) | texto padronizado de cada anúncio, gravado ao lado do original |
+| `hdb topicos --topicos 6 --versao t5` | o corpus `corp3` | tópicos (palavras e pesos) e a mistura de tópicos de cada anúncio, gravados com o nome da versão |
 
-- **Saída do `hdb corpus`:** quantos anúncios entraram no corpus e quantos foram descartados, com o motivo (tipo, aluguel sem marca de escravizado, OCR com confiança baixa, poucas palavras), e a contagem por período legal.
+- **Saída do `hdb corpus`:** quantos anúncios entraram no corpus e quantos foram descartados, com o motivo (tipo, aluguel sem marca de escravizado, fuga sem sinal de pessoa, OCR com confiança baixa, poucas palavras), e a contagem por período legal.
 - **Saída do `hdb topicos`:** uma linha com o número de anúncios e a perplexidade. Depois, para cada tópico, quantos anúncios o têm como dominante, as palavras mais fortes e a divisão por período legal e por tipo.
-- **Versões usadas:** `t3` (6 tópicos) é a principal; `t2` (8 tópicos) serve de comparação.
+- **Versões usadas:** `t5` (6 tópicos, corpus `corp3`) é a principal; `t5i` (corpus `corp3i`) mede a sensibilidade aos aluguéis incertos; `t4` (corpus antigo) serve de comparação. Para refazer tudo de uma vez, veja `scripts/rodar_tudo.py` no guia.
 
 Depois, a análise (passos 5 e 6) é feita em um notebook, lendo o banco ([notebooks/topicos_por_periodo.ipynb](notebooks/topicos_por_periodo.ipynb)).
 
@@ -150,7 +168,7 @@ Depois, a análise (passos 5 e 6) é feita em um notebook, lendo o banco ([noteb
 
 - **Tópico não é fato histórico.** É um padrão de palavras. Quem dá sentido é a leitura do grupo, com a contextualização.
 - **Poucos anúncios dão tópicos instáveis.** Com algumas centenas de anúncios, rode mais de uma vez e veja se os tópicos se repetem.
-- **Estabilidade medida:** k=6 repete ~52% dos tópicos com similaridade ≥0,8; k=12, 21%. Por isso o k=6 é o principal, e o k=8 entra como comparação. Rode `scripts/estabilidade_topicos.py` a cada mudança no corpus.
+- **Estabilidade medida:** k=6 repete 50% dos tópicos com similaridade ≥0,8 (k=4, 58%; k=8, 43%; k=12, 34%; corpus de 2.094 anúncios, 24/11). Por isso o k=6 é o principal, e o k=8 entra como comparação. Rode `scripts/estabilidade_topicos.py` a cada mudança no corpus.
 - **O OCR deixa ruído.** Palavras erradas podem formar um "tópico de lixo". A padronização e o corte de confiança reduzem isso.
-- **Anúncios grudados misturam temas.** Às vezes dois ou três anúncios vizinhos saem como um só. O jornal os separa com um travessão ("—"), e usar isso na separação é uma melhoria planejada.
+- **Anúncios grudados misturam temas.** Às vezes dois ou três anúncios vizinhos saem como um só. O corpus `corp3` já corta o pedaço na abertura de outro anúncio e fica com o primeiro trecho que tem pessoa. Usar o travessão ("—") como divisor do jornal continua planejado.
 - **A amostra não é sorteada do jornal inteiro.** Ela vem de frases de busca, então mostra os anúncios **que essas frases acham**. Vale dizer isso na apresentação; o relatório metodológico (`hdb relatorio`) registra o caminho.

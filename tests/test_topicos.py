@@ -4,7 +4,8 @@ import numpy as np
 
 from hdb import config
 from hdb.banco import BancoMemoria
-from hdb.topicos import (ajustar, anuncios_tipicos, formatar_resumo, misturas, palavras_dos_topicos, processar)
+from hdb.topicos import (ajustar, anuncios_tipicos, formatar_resumo, misturas, palavras_dos_topicos, processar,
+                         semente_representativa)
 
 TEMAS = {
     "fuga": "fugiu escravo fugido fujao matto capitao rastro recompensa gratifica levou fugida",
@@ -109,3 +110,19 @@ def test_corpus_vazio_avisa():
     import pytest
     with pytest.raises(ValueError):
         processar(BancoMemoria(), "corp1", 3, 0, "t1")
+
+
+def test_semente_representativa_e_do_conjunto_e_repetivel():
+    textos, _ = corpus()
+    semente, medias = semente_representativa(textos, 3, sementes=range(4))
+    assert semente in range(4) and set(medias) == {0, 1, 2, 3}
+    assert all(0 < m <= 1.0001 for m in medias.values())
+    assert medias[semente] == max(medias.values())
+    assert semente_representativa(textos, 3, sementes=range(4))[0] == semente
+
+
+def test_processar_com_semente_auto_grava_a_escolhida():
+    textos, _ = corpus()
+    banco = banco_com_corpus(textos)
+    processar(banco, "corp1", 3, "auto", "t1")
+    assert isinstance(banco.topico_modelos["t1"]["semente"], int)

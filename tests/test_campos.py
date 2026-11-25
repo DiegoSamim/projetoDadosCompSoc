@@ -3,6 +3,7 @@ import pytest
 from hdb.banco import BancoMemoria
 from hdb.campos import (VERSAO_CAMPOS, classificar, extrair, extrair_anuncio, formatar_resumo, linha_do_banco,
                         processar, resumir)
+from hdb.campos import _classificar
 
 T1 = "VENDE-SE huma linda negrinha de 13 annos, que cose soflrivelmente, engomma, lava, e faz o mais"
 T2 = "VENDE-SE hum molecote de 18 annos , peça , perito official de marceneiro de toda a obra, que dá"
@@ -317,8 +318,8 @@ def c4(texto, abertura):
     return extrair_anuncio({"texto": texto, "abertura": abertura})
 
 
-def test_versao_c4():
-    assert VERSAO_CAMPOS == "c4"
+def test_versao_c5():  # c5: fuga e "outro" exigem pessoa (ver NAO_PESSOA)
+    assert VERSAO_CAMPOS == "c5"
 
 
 @pytest.mark.parametrize("texto,abertura", [
@@ -410,3 +411,83 @@ def test_c4_anuncio_colado_nao_empresta_a_marca():
 def test_c4_resumo_conta_aluguel_incerto():
     r = resumir([{"tipo": "aluguel_incerto", "sexo": None, "idade_min": None, "nacoes": [], "nomes": [], "recompensa": False}])
     assert r["por_tipo"] == {"aluguel_incerto": 1} and "aluguel_incerto: 1" in formatar_resumo(r)
+
+
+# --- c5: fuga só com pessoa; animal, papel, remédio e navio desaparecidos são "outro" ---
+
+LIXO_C5 = [
+    ("DESAPPARECEU", "Desapareceu da rua do Haddock Lobo n. 43 cão com os seguintes signaes: duas grandes malhas "
+                     "brancas no lombo; quem o levar será gratificado.", "cao"),
+    ("DESAPPARECEU", "Desapareceu, no dia 13 do corrente, um cachorro novo, raça Terra-Nova, pello escuro; "
+                     "quem o achar queira levar á rua da Quitanda n. 9, que será bem recompensado.", "cachorro"),
+    ("DESAPPARECEU", "DESAPPARECEU uma cautela do monte do soccorro n. 1234; pede-se a quem a achou o favor de "
+                     "entrega-la na rua da Alfandega n. 8.", "cautela"),
+    (None, "Este precioso medicamento cura tudo e faz desapparecer as molestias da pelle; vende-se na rua do "
+           "Ouvidor n. 40.", "medicamento"),
+    (None, "A guarnição do brigue fugio para terra no escaler, a nado, e foi apprehendida na praia.", "guarnicao"),
+    (None, "FUGIO o cavallo ruço do Sr. Antonio; quem o apprehender será gratificado na rua do Lavradio n. 3.",
+     "cavallo"),
+]
+
+
+@pytest.mark.parametrize("abertura,texto,palavra", LIXO_C5)
+def test_c5_animal_papel_remedio_navio_e_outro(abertura, texto, palavra):
+    r = extrair_anuncio({"texto": texto, "abertura": abertura})
+    assert r["tipo"] == "outro"
+    assert palavra in r["evidencias"]["tipo"] and r["evidencias"]["tipo"].startswith("sem pessoa")
+
+
+def test_c5_cabra_animal_nao_e_pessoa():
+    texto = ("DESENCAMINHOU-SE uma cabra branca; quem a levar á chacara n. 17, Cosme Velho, receberá alviçaras.")
+    assert extrair_anuncio({"texto": texto})["tipo"] == "outro"
+    assert extrair_anuncio({"texto": "42. " + texto})["tipo"] == "outro"
+
+
+@pytest.mark.parametrize("texto,abertura", [
+    ("FUGIO, no dia 25 de dezembro rua de Ma R", "FUGIO"),  # OCR ruim, sem pessoa: abertura basta
+    ("dezappareceu hum muleque de Nação Benguella, por nome Antonio, de idade de 11 a 12 annos", None),
+    ("DESAPPARECEU hum moleque de Nação Benguella, por nome Antonio, de idade de 11 a 12 annos", "DESAPPARECEU"),
+    ("FUGIO hum escravo de nome Francisco, Angola", "FUGIO"),
+    ("fugio uma cabra de nome Maria, de 20 annos, nação Mina", None),
+    ("fugio uma cabra de nome Maria, de 20 annos, nação Mina", "FUGIO"),
+])
+def test_c5_fugas_reais_continuam_fuga(texto, abertura):
+    assert extrair_anuncio({"texto": texto, "abertura": abertura})["tipo"] == "fuga"
+
+
+def test_c5_marca_de_escravizado_vence_a_guarda():
+    t = "VENDE-SE uma preta de 20 annos e um cavallo; na rua do Ouvidor n. 5."
+    assert extrair_anuncio({"texto": t, "abertura": "VENDE-SE"})["tipo"] == "venda"
+
+
+def test_c5_fuga_com_sinais_de_pessoa_mesmo_sem_a_palavra():
+    """OCR estraga "escrava"; a fuga ainda tem idade, "sabe ler", "natural de" ou o dono."""
+    casos = ["mudar de roupa quando anda fugido, sabe ler e escrever, e talvez se intitule livre; quem o apprehender levará á rua dos Benedictinos n. 1",
+             "Fagio no dia 10 do proximo passado, esorava do Antonio Albino de Souza, quem a prender será gratificado",
+             "FUGIDO em Fevereiro de 1854, da fazenda, o Antonio, natural da Parahyba, cheio de corpo, quem o apprehender receberá alviçaras"]
+    for texto in casos:
+        assert classificar({"texto": texto})[0] == "fuga", texto
+
+
+def test_c5_estrada_nao_parece_escravo():
+    texto = "Desappareceu a cautela do monte do soccorro; encarregado da estrada do Engenho Velho, receberá alviçaras"
+    assert classificar({"texto": texto})[0] == "outro"
+
+
+def test_c5_ama_de_leite_com_adjetivo_e_preto_livre():
+    assert classificar({"texto": "PRECISA-SE alugar uma preta com bom leite, acabada de criar uma menina; na rua da Alfandega n. 256"})[0] == "ama_de_leite"
+    tipo, _, motivo = _classificar({"texto": "ALUGA-SE um preto livre, perito cozinheiro e muito fiel; na rua do Sacadura n. 7"})
+    assert tipo == "outro" and "livre" in motivo
+    assert classificar({"texto": "ALUGA-SE um preto escravo, perito cozinheiro e muito fiel; na rua do Sacadura n. 7"})[0] == "aluguel"
+
+
+def test_c5_guarda_de_animal_nao_derruba_ama_de_leite_com_anuncio_colado():
+    """O OCR cola o anúncio vizinho (uma besta, uma cabra) na janela; a pessoa anunciada protege o anúncio."""
+    assert classificar({"texto": "ALUGA-SE uma ama de leite ; na rua de D. Manoel n. 5 — VENDE-SE uma besta com arreios novos; na rua da Praia"})[0] == "ama_de_leite"
+    assert classificar({"texto": "VENDE-SE uma excelente ama de leite com uma cria de dous mezes, que lava, engomma e cose; vende-se tambem um cachorro"})[0] == "ama_de_leite"
+    assert classificar({"texto": "VENDE-SE uma cabra de raça, com abundancia de leite, por 60$; na rua do Cassia"})[0] == "outro"
+
+
+def test_c5_cosmetico_e_remedio_com_leite_nao_sao_ama_de_leite():
+    assert classificar({"texto": "COSMETICO Vende-se na rua do Rosario n. 25 — o leite de rosas da D. Felicidade embelleza as mulheres"})[0] == "outro"
+    assert classificar({"texto": "O Arrobe Laffeeteur é precioso contra as molestias dos negros; um chancre no meato urinario, leite de vaca"})[0] == "outro"

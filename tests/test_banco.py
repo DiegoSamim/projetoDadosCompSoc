@@ -349,3 +349,80 @@ def test_supabase_equilibrar_chama_a_funcao_nova_sem_p_aleatorio():
     b.reservar("ana", 5, bib="a", termo="t", equilibrar=True)
     nome, params = chamadas[0]
     assert nome == "reservar_paginas_equilibradas" and "p_aleatorio" not in params and "p_equilibrar" not in params
+
+
+# --- novas tentativas em falhas passageiras ---
+
+import httpx
+
+
+class _Falha:
+    """Cliente simulado: `.rpc(...).execute()` falha `falhas` vezes com `erro` e depois devolve dados."""
+
+    def __init__(self, falhas, erro):
+        self.falhas, self.erro, self.chamadas = falhas, erro, 0
+
+    def rpc(self, nome, params):
+        return self
+
+    def table(self, nome):
+        return self
+
+    def select(self, *a, **k):
+        return self
+
+    def range(self, a, b):
+        return self
+
+    def execute(self):
+        self.chamadas += 1
+        if self.chamadas <= self.falhas:
+            raise self.erro
+        return type("R", (), {"data": [1, 2]})()
+
+
+def _banco_com(cliente):
+    b = object.__new__(modulo_banco.BancoSupabase)
+    b.cliente = cliente
+    b._espera = (0, 0)
+    return b
+
+
+def _erro_http(status):
+    req = httpx.Request("POST", "https://x")
+    return httpx.HTTPStatusError("falha", request=req, response=httpx.Response(status, request=req))
+
+
+@pytest.mark.parametrize("erro", [httpx.ReadTimeout("t"), httpx.ConnectTimeout("t"),
+                                  httpx.RemoteProtocolError("p"), _erro_http(503), _erro_http(429)])
+def test_rpc_e_todas_tentam_de_novo_em_falha_passageira(erro):
+    cliente = _Falha(2, erro)
+    assert _banco_com(cliente)._rpc("f") == [1, 2]
+    assert cliente.chamadas == 3
+    cliente = _Falha(2, erro)
+    assert modulo_banco._todas(_banco_com(cliente).cliente.table("t").select("*")) == [1, 2]
+    assert cliente.chamadas == 3
+
+
+def test_falha_sempre_levanta_o_erro_original_depois_de_3_tentativas():
+    erro = httpx.ReadTimeout("sem resposta")
+    cliente = _Falha(99, erro)
+    with pytest.raises(httpx.ReadTimeout) as e:
+        _banco_com(cliente)._rpc("f")
+    assert e.value is erro and cliente.chamadas == 3
+
+
+def test_erro_4xx_nao_e_retentado():
+    cliente = _Falha(99, _erro_http(400))
+    with pytest.raises(httpx.HTTPStatusError):
+        _banco_com(cliente)._rpc("f")
+    assert cliente.chamadas == 1
+
+
+def test_espera_crescente_entre_as_tentativas(monkeypatch):
+    dormiu = []
+    monkeypatch.setattr(modulo_banco.time, "sleep", dormiu.append)
+    b = _banco_com(_Falha(2, httpx.ReadTimeout("t")))
+    b._espera = modulo_banco.ESPERAS
+    b._rpc("f")
+    assert dormiu == [1, 3]

@@ -72,7 +72,8 @@ def cmd_campos(args):
 def cmd_corpus(args):
     from hdb.corpus import formatar_resumo, processar
 
-    print(formatar_resumo(processar(_banco(), args.versao_campos, args.versao)))
+    versao = args.versao + "i" if args.incluir_incertos and args.versao == config.VERSAO_CORPUS else args.versao
+    print(formatar_resumo(processar(_banco(), args.versao_campos, versao, incluir_incertos=args.incluir_incertos)))
 
 
 def cmd_topicos(args):
@@ -212,7 +213,9 @@ def criar_parser():
     p.add_argument("--versao-campos", default=config.VERSAO_CAMPOS,
                    help=f"versão dos campos (tipo) a usar na seleção (padrão: {config.VERSAO_CAMPOS})")
     p.add_argument("--versao", default=config.VERSAO_CORPUS,
-                   help=f"versão do corpus; regravar a mesma substitui (padrão: {config.VERSAO_CORPUS})")
+                   help=f"versão do corpus; regravar a mesma substitui (padrão: {config.VERSAO_CORPUS}; com --incluir-incertos, o padrão ganha um 'i')")
+    p.add_argument("--incluir-incertos", action="store_true",
+                   help="não descarta o aluguel_incerto (variante do corpus; grava, por padrão, corp3i)")
     p.set_defaults(func=cmd_corpus)
 
     p = sub.add_parser("topicos", help="modelagem de tópicos (LDA) sobre o corpus padronizado; grava palavras e "
@@ -221,8 +224,8 @@ def criar_parser():
                    help=f"versão do corpus a modelar (padrão: {config.VERSAO_CORPUS})")
     p.add_argument("--topicos", type=int, default=config.N_TOPICOS,
                    help=f"número de tópicos (padrão: {config.N_TOPICOS})")
-    p.add_argument("--semente", type=int, default=config.SEMENTE_TOPICOS,
-                   help=f"semente do LDA (padrão: {config.SEMENTE_TOPICOS})")
+    p.add_argument("--semente", type=lambda v: v if v == "auto" else int(v), default=config.SEMENTE_TOPICOS,
+                   help=f"semente do LDA, ou 'auto' para a mais representativa de 10 (padrão: {config.SEMENTE_TOPICOS})")
     p.add_argument("--versao", default=config.VERSAO_TOPICOS,
                    help=f"versão do modelo; regravar a mesma substitui (padrão: {config.VERSAO_TOPICOS})")
     p.set_defaults(func=cmd_topicos)

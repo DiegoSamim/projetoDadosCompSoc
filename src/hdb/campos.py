@@ -73,8 +73,18 @@ ENTRE_VERBOS = 15  # caracteres mínimos entre dois verbos de negócio para o 2�
 LIVRE_OU_ESCRAVO = re.compile(r"\blivres?\s+ou\s+escrav[oa]s?\b|\bescrav[oa]s?\s+ou\s+livres?\b")  # não marca ninguém
 MARCA_ESCRAVIZADO = re.compile(r"\b(?:moleque|molecote|moleca|molecota)s?\b")  # além de cores, escravo, forro
 NAVIO = re.compile(r"\bequip\w*\.?\s*\d|\bpassag\w*\.?\s*\d|\bcarga\b")  # movimento de porto, "1 escravo" passageiro
+# c5: cão, cautela, remédio e navio desaparecidos não são pessoas. Termos que quase nunca estão em anúncio de
+# pessoa; de fora ficam de propósito "galera", "vapor", "carga" (aparecem em anúncios legítimos), "letra" solta
+# ("boa letra" é qualidade de quem escreve; só "letra de câmbio/do tesouro") e "mulher"/"filho". Só vale se a janela
+# não tiver marca de escravizado (cor, escravo, forro, moleque), senão "vende-se uma preta e um cavallo" cairia.
+NAO_PESSOA = re.compile(
+    r"\b(?:cao|caes|cachorr[oa]s?|gatos?|gatas?|cava+llos?|cavalos?|eguas?|burros?|bois?|vacas?|porcos?|carneiros?"
+    r"|papagaios?|passaros?|cabritos?|mulas?|jumentos?|bestas?"  # animais
+    r"|cautelas?|apolices?|letras?\s+(?:de\s+cambio|do\s+thesouro)|bilhetes?|loterias?"  # papéis
+    r"|medicamentos?|pilulas?|xaropes?|unguentos?|remedios?|banhos?|rheumatismo|cosmeticos?|pomadas?|sabonetes?|arrobe|chancres?|venereos?|syphili\w+"  # remédios
+    r"|guarnicao|guarnicoes|escaleres?|fragatas?|brigues?|tripulacao|tripulacoes|embarcacao|embarcacoes)\b")
 ACHAR = re.compile(r"\bquem\s*[oa]?\s*(?:o\s+|a\s+)?(?:achar|apprehender|pegar|prender|capturar|trouxer)")
-LEITE = re.compile(r"\bama\s+(?:de|com)\s+leite\b|\b(?:com|de)\s+leite\b")
+LEITE = re.compile(r"\bama\s+(?:de|com)\s+leite\b|\b(?:com|de)\s+(?:\w+\s+){0,2}leite\b")  # "com bom leite"
 PEDIDO = re.compile(r"\b(alugar|alugarem|alugue|comprar|comprarem)\b")
 COR_LIVRE = {"fula", "fulo", "bocal", "ladino", "ladina", "africano", "africana"}  # qualidades que valem sem artigo
 
@@ -132,6 +142,7 @@ NAO_NOMES = {"nacao", "sr", "senhor", "sra", "senhora", "rua", "largo", "beco", 
 
 FORRO = re.compile(r"\b(?:forr[oa]s?|libert[oa]s?)\b")
 ESCRAVIZADO = re.compile(r"\b(?:escrav[oa]s?|cativ[oa]s?|captiv[oa]s?)\b")
+COR_LIVRE_EXPLICITA = re.compile(r"\b(?:preto|preta|pardo|parda|crioul[oa]|negr[oa]|mulat[oa])s?\s+livres?\b(?!\s+de\b)")
 LIVRE = re.compile(  # "calças brancas" não é gente branca; "livre de achaques" não é condição
     r"\blivres?\b(?!\s+de\b)|\bfilh[oa]s?\s+das\s+ilhas\b|\bilheu\b"
     r"|\b(?:sra|senhora|moca|mulher|homem|rapaz|menina|menino)\.?\s+branc[oa]\b|\bhuma?\s+branc[oa]\b")
@@ -157,6 +168,8 @@ def _pessoas(norm):
     for k, (raw, i, j) in enumerate(tokens):
         palavra = _singular(raw)
         if palavra not in PESSOAS or norm[i - 1:i] == "-" or norm[j:j + 1] == "-":  # "arta-preta": composto
+            continue
+        if palavra == "cabra" and not _marca_fora_cabra(_janela(norm)):  # c5: "uma cabra branca" é bicho
             continue
         antes = range(max(0, k - 2), k)
         numeral = re.search(r"\d\s*$", norm[:i])
@@ -221,10 +234,48 @@ def _achar_com_premio(norm):
     return bool(ACHAR.search(norm) and RECOMPENSA.search(norm) and any(_singular(r) in PESSOAS for r, _, _ in _tokens(norm)))
 
 
-def _marca_de_escravizado(norm):
-    """Há cor, "escravo", forro ou "moleque" no texto: palavra que só se diz de pessoa escravizada ou egressa."""
+def _marca_de_escravizado(norm, com_cabra=True):
+    """Há cor, "escravo", forro ou "moleque" no texto: palavra que só se diz de pessoa escravizada ou egressa.
+
+    `com_cabra=False` não conta "cabra" como cor (ela só vale com outra marca; ver `_marca_fora_cabra`).
+    """
     return bool(ESCRAVIZADO.search(norm) or FORRO.search(norm) or MARCA_ESCRAVIZADO.search(norm)
-                or any(p in CORES for p, _, _ in _palavras(norm)))
+                or any(p in CORES and (com_cabra or CORES[p] != "cabra") for p, _, _ in _palavras(norm)))
+
+
+def _marca_fora_cabra(norm):
+    """Outra marca de pessoa além de "cabra": cor, escravo, forro, moleque, nação, idade ou "por nome"."""
+    return _marca_de_escravizado(norm, com_cabra=False) or bool(CONTEXTO_DEPOIS.search(norm))
+
+
+# c5: o OCR estraga a palavra de pessoa ("pre ta", "eseras vo", "mol leques", "excravo") ou a grafia é outra ("muleque"),
+# mas o anúncio de fuga de gente ainda traz idade, nação, "de nome", o corpo, a roupa levada ou o dono. Não vale
+# `CONTEXTO_DEPOIS` aqui: "de 8" e "que tem" só dizem algo logo depois de uma palavra de pessoa.
+SINAIS_DE_PESSOA = re.compile(
+    r"\bmu?l[ae]qu\w*|\be?[sx]?cravos?\b|\bsignaes\b|\bsignal\b|\bidade\b|\bnacao\b|\b(?:de|por)\s+nome\b"
+    r"|\b\d{1,2}\s*(?:a\s*\d{1,2}\s*)?a[nu]{1,2}[o0]s\b"
+    r"|\b(?:cabellos?|barba|olhos|nariz|beicos?|dentes|cicatrizes?|bexigas|magr[oa]|estatura|altura)\b"
+    r"|\b(?:camisas?|camizas?|calcas?)\b|\b(?:levou|levava|vestia)\s+(?:vestido|saia|chita|lenco|roupa)"
+    r"|\bseu\s+senhor\b|\b(?:bucal|bocal|ladin[oa])\b|\bnatural\s+d[aeo]s?\b|\bsabe\s+ler\b|\bintitul\w*|\b(?:cheio|cheia)\s+de\s+corpo\b")
+
+
+def _parece_escravo(norm):
+    """Alguma palavra de 6 a 8 letras a até 2 erros de "escravo"/"escrava" (OCR: "esorava", "excravo")."""
+    return any(6 <= len(p) <= 8 and "rav" in p and (distancia(p, "escravo") <= 2 or distancia(p, "escrava") <= 2)  # "estrada" não
+               for p, _, _ in _palavras(norm))
+
+
+def _sinal_de_pessoa(norm):
+    """Há pessoa no texto: palavra de pessoa com contexto, marca de escravizado ou sinais de gente (`SINAIS_DE_PESSOA`)."""
+    return bool(_pessoas(norm) or _marca_de_escravizado(norm, com_cabra=False) or SINAIS_DE_PESSOA.search(norm)
+                or _parece_escravo(norm))
+
+
+def _animal_papel_remedio_navio(norm):
+    """A palavra de NAO_PESSOA nos primeiros JANELA_PESSOA caracteres sem marca de escravizado nem palavra de pessoa ali, ou None."""
+    inicio = _janela(norm)
+    m = NAO_PESSOA.search(inicio)
+    return m.group() if m and not (_marca_de_escravizado(inicio, com_cabra=False) or _pessoas(inicio)) else None
 
 
 def _janela(norm):
@@ -259,6 +310,9 @@ def _motivo_de_outro(norm):
     inicio = _janela(norm)
     if not _pessoas(inicio):
         return "sem palavra de pessoa nos primeiros 200 caracteres"
+    cor_livre = COR_LIVRE_EXPLICITA.search(LIVRE_OU_ESCRAVO.sub(" ", inicio))  # c5: "um preto livre" não é escravizado
+    if cor_livre:
+        return f"pessoa livre ({cor_livre.group().strip()})"
     livre = NACIONALIDADE_LIVRE.search(inicio) or SRA.search(inicio) or LIVRE.search(inicio)
     if livre and not _marca_de_escravizado(inicio):
         return f"pessoa livre ({livre.group().strip()}) sem marca de escravizado"
@@ -277,9 +331,10 @@ def _tipo_do_negocio(verbo, norm):
 def classificar(anuncio):
     """(tipo, procura) do anúncio; `_classificar` também dá o motivo de um venda/compra/aluguel virar "outro".
 
-    Precedência: 1. título/seção de fuga; 2. abertura de fuga; 3. sem verbo de negócio: movimento de porto
+    Precedência (c5): 0. animal, papel, remédio ou navio na janela sem marca de escravizado é "outro" (ver `NAO_PESSOA`);
+    1. título/seção de fuga; 2. abertura FUGIO/FUGIU/EVADIO-SE (vale sem pessoa: OCR ruim); DESAPPARECEU só com pessoa; 3. sem verbo de negócio: movimento de porto
     ("equip. 6 ... carga") é outro; 4. sem verbo de negócio: palavras de fuga no texto, ou "quem achar ... gratificado"
-    com gente (para "VENDE-SE ... não fugio" não virar fuga; aviso numerado "N." precisa delas); 5. fala de pessoa
+    com gente (palavra de fuga solta também exige sinal de pessoa, c5; para "VENDE-SE ... não fugio" não virar fuga; aviso numerado "N." precisa delas); 5. fala de pessoa
     (palavra de pessoa com contexto de pessoa; "seda preta" não vale); 6. ama de leite (vale mesmo com
     ALUGA-SE/VENDE-SE); 7. venda/compra/aluguel, só com pessoa escravizável no começo do anúncio (c3; ver
     `_motivo_de_outro`); aluguel (inclusive PRECISA-SE) sem marca explícita de escravizado na janela é
@@ -291,17 +346,27 @@ def classificar(anuncio):
 
 
 def _classificar(anuncio):
-    """(tipo, procura, motivo): motivo só quando venda/compra/aluguel virou "outro" ou aluguel virou "aluguel_incerto"."""
+    """(tipo, procura, motivo): motivo só quando algo virou "outro" (venda/compra/aluguel/fuga sem pessoa) ou aluguel virou "aluguel_incerto"."""
     texto = anuncio.get("texto") or ""
     norm = _simples(texto)
     abertura = anuncio.get("abertura") or achar_abertura(texto) or achar_numeracao(texto)
     verbo = _verbo(abertura, norm)
-    if _titulo_de_fuga(anuncio.get("titulo")) or verbo == "fuga":
+    lixo = _animal_papel_remedio_navio(norm)
+    if lixo:
+        return "outro", False, f"sem pessoa; animal/papel/remédio/navio: {lixo}"
+    if _titulo_de_fuga(anuncio.get("titulo")):
+        return "fuga", False, None
+    if verbo == "fuga":
+        if abertura == "DESAPPARECEU" and not _sinal_de_pessoa(norm):  # FUGIO/EVADIO-SE valem mesmo com OCR sem pessoa
+            return "outro", False, "sem pessoa; abertura DESAPPARECEU sem palavra de pessoa"
         return "fuga", False, None
     if verbo is None and NAVIO.search(norm):
         return "outro", False, None
-    if verbo is None and (_tem_palavra_de_fuga(norm) or _achar_com_premio(norm)
-                          or (abertura == "N." and _fugio_mal_lido(norm))):
+    if verbo is None and (_tem_palavra_de_fuga(norm) or _achar_com_premio(norm)):
+        if _sinal_de_pessoa(norm):
+            return "fuga", False, None
+        return "outro", False, "sem pessoa; palavra de fuga solta sem palavra de pessoa"
+    if verbo is None and abertura == "N." and _fugio_mal_lido(norm):
         return "fuga", False, None
     if verbo is None:  # abertura "N." ou nenhuma: o verbo pode estar no meio do texto
         verbo = _verbo(None, norm)

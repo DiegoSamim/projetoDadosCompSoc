@@ -4,7 +4,7 @@
 
 Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes termos) · [guia_ferramenta.md](guia_ferramenta.md) (cada comando) · [linguagem_natural.md](linguagem_natural.md) (como funcionam os tópicos) · notebooks em [notebooks/](notebooks/) · [relatório metodológico](relatorios/).
 
-**Atualizado em 24/11/2026.** Este documento tem três partes: o que está **feito**, o que **falta** e as **melhorias** possíveis.
+**Atualizado em 25/11/2026.** Este documento tem três partes: o que está **feito**, o que **falta** e as **melhorias** possíveis.
 
 ---
 
@@ -13,8 +13,8 @@ Detalhes, quando precisar: [termos_busca.md](termos_busca.md) (por que estes ter
 1. A coleta fechou: **158 páginas** no banco, a amostra planejada está **completa (69 de 69)**, mais os extras.
 2. **Faltam separar 49 páginas** em anúncios, e isso só pode ser feito no computador de quem as capturou.
 3. A ferramenta já faz tudo, da captura aos **tópicos (LDA)**, e os 3 notebooks rodam com dados reais.
-4. O resultado atual é **provisório**: 655 anúncios no corpus, 4 temas estáveis e 2 de ruído. Os números mudam quando as 49 páginas entrarem.
-5. O que falta é sobretudo **trabalho do grupo**: conferir anúncios, nomear tópicos, contextualizar e montar os slides.
+4. A **Etapa 2 da limpeza está feita (25/11)**: regras de tipo (`c5`), corte de anúncios colados, erros de OCR e conferência por amostra, no corpus `corp3` e nos tópicos `t5`. Os números finais saem na próxima rodada. Ainda faltam 1887–1888 e as páginas sem separação.
+5. **Próximo passo do grupo:** nomear os tópicos (C2; Etapa 4 do [plano_dados.md](plano_dados.md)) e capturar o complemento (A3). Depois, contextualizar e montar os slides.
 
 ---
 
@@ -61,11 +61,12 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 | Contar e escolher termos | `hdb buscar`, `hdb acervos`, `hdb panorama` | pronto; 134 termos contados |
 | Capturar página (CAPTCHA por pessoa) e OCR | `hdb capturar`, `scripts/amostra.py` | pronto; ~63 s por página |
 | Separar anúncios | `hdb anuncios` (agora pula o que já foi feito; `--refazer`) | pronto, versão `v2` |
-| Extrair campos | `hdb campos` | pronto, versão **`c4`** |
-| Corpus padronizado | `hdb corpus` | pronto, versão **`corp2`** |
-| Modelagem de tópicos | `hdb topicos` | pronto; `t2` (k=8) e `t3` (k=6) gravados |
+| Extrair campos | `hdb campos` | pronto, versão **`c5`** (antes `c4`) |
+| Corpus padronizado | `hdb corpus` | pronto, versão **`corp3`** (antes `corp2`); variante `corp3i` para comparar |
+| Modelagem de tópicos | `hdb topicos` | pronto; `t5` (k=6, corpus `corp3`) é a principal; `t5i` (sensibilidade) e `t4` (corpus antigo) gravados |
 | Estabilidade do LDA | `scripts/estabilidade_topicos.py` | pronto |
 | Relatório metodológico | `hdb relatorio` | pronto; seção de limites ampliada |
+| Limpeza e conferência (Etapa 2) | `scripts/rodar_tudo.py`, `scripts/avaliar_limpeza.py` | pronto em 25/11 (versão `c5` na classificação) |
 
 ### O que cada versão corrigiu
 
@@ -85,17 +86,17 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 
 ### Os resultados provisórios
 
-**Estabilidade (10 sementes por k):** k=4 repete 50% dos tópicos; **k=6, 52%**; k=8, 43%; k=12, 21%. Usamos o **k=6** como principal e o k=8 como comparação.
+**Estabilidade (10 sementes por k):** k=4 repete 58% dos tópicos; **k=6, 50%**; k=8, 43%; k=10, 37%; k=12, 34% (corpus de 2.094 anúncios, medido em 24/11). Usamos o **k=6** como principal e o k=8 como comparação.
 
-**Temas que se repetem em todas as sementes:** aluguel de trabalho doméstico, fuga em geral, fuga com descrição do corpo e das roupas, ama de leite. **Temas fracos:** avisos oficiais e de navegação, venda ou ação judicial, e um tópico vago.
+**Temas que se repetem nas sementes (k=8):** fuga (0,95), serviço doméstico de mulheres (0,85), ama de leite (0,80) e aluguel de serviço (0,77). **Temas fracos:** um tópico geral de venda (0,64) e os dois tópicos pequenos e misturados do k=6 (avisos com lugar e data; venda de moleques e colunas variadas).
 
-| O que os números mostram (`t3`, 655 anúncios) | antes de 1831 | 1831–50 | 1850–71 | 1871–88 |
+| O que os números mostram (`t4`, 2.094 anúncios) | antes de 1831 | 1831–50 | 1850–71 | 1871–88 |
 |---|---:|---:|---:|---:|
-| Tópico de aluguel doméstico | 7,7% | 18,4% | 27,6% | **38,6%** |
-| Tópico de fuga descrita | **25,8%** | n/d | n/d | 6,5% |
-| Fuga com recompensa (de 189 fugas) | 52% | 62% | 19% | 10% |
+| Tópico de aluguel de mulheres e ama de leite (T2) | 13,1% | 23,1% | 27,6% | **28,5%** |
+| Tópico de fuga (T0) | **42,8%** | 18,6% | 15,1% | 15,5% |
+| Fuga com recompensa (de 546 fugas) | 52% | 65% | 30% | 13% |
 
-**Cuidado com a leitura:** a fuga é 58% dos anúncios antes de 1831 e 18% em 1871–1888. Parte da mudança vem do que as frases de busca acharam em cada período.
+**Cuidado com a leitura:** a fuga é 58% dos anúncios antes de 1831 e 27% em 1871–1888 (19% em 1850–1871; o aumento vem das páginas de cobertura dos anos 1880). Parte da mudança vem do que as frases de busca acharam em cada período.
 
 ---
 
@@ -114,17 +115,18 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 
 | # | Tarefa | Quem | Pronto quando |
 |---|---|---|---|
-| B1 | **Conferir 10 anúncios por período** (15 min cada) e anotar erros de tipo, sexo e anúncios colados | as 3 pessoas | se o tipo estiver certo em 8 de 10, seguimos; senão, nova versão de `campos` |
-| B2 | **Decidir o que fazer com os 67 `aluguel_incerto`**: ficam de fora do corpus (hoje), entram como tipo à parte, ou entram só se tiverem cor | grupo | decisão registrada no relatório |
-| B3 | **Filtrar o ruído que sobrou**: avisos de navegação e juízo (tópico 5), banhos medicinais passando como fuga, colunas inteiras de classificados | Claude | os tópicos de ruído somem ou ficam isolados |
-| B4 | **Anúncios colados**: usar o travessão como divisor (separação v3) | Claude | os anúncios do exemplo 5941 saem separados |
+| B1 | **FEITO em 25/11 (automático; revisão de Claude, não do grupo).** Conferir 10 anúncios por período (15 min cada) e anotar erros de tipo, sexo e anúncios colados. Conferência com 120 + 40 anúncios sorteados, medida por `scripts/avaliar_limpeza.py`; o grupo pode repetir com os mesmos arquivos | as 3 pessoas | se o tipo estiver certo em 8 de 10, seguimos; senão, nova versão de `campos` |
+| B2 | **FEITO em 25/11 como variante (`corp3i`, só para comparar).** Decidir o que fazer com os 67 `aluguel_incerto`: ficam de fora do corpus (hoje), entram como tipo à parte, ou entram só se tiverem cor. A escolha final continua com o grupo | grupo | decisão registrada no relatório |
+| B3 | **FEITO em 25/11** (regras de tipo `c5` e motivo `sem_pessoa`). Filtrar o ruído que sobrou: avisos de navegação e juízo (tópico 5), banhos medicinais passando como fuga, colunas inteiras de classificados | Claude | os tópicos de ruído somem ou ficam isolados |
+| B4 | **PARCIAL, 25/11:** o corte de anúncios colados está feito (`corp3`). Usar o travessão como divisor (separação v3) continua pendente | Claude | os anúncios do exemplo 5941 saem separados |
 | B5 | **56 fragmentos** com menos de 60 caracteres | Claude | juntados ao anúncio vizinho ou descartados |
+| B6 | **FEITO em 25/11:** erros de OCR da primeira letra (`luga`→`aluga`, `ozinha`→`cozinha`) corrigidos no corpus; as demais correções possíveis só são listadas | Claude | aplicado no `corp3` |
 
 ### C. Análise e apresentação (trabalho do grupo)
 
 | # | Tarefa | Quem | Depende de |
 |---|---|---|---|
-| C1 | **Repetir a sequência com as 49 páginas novas:** `hdb corpus`, `hdb topicos`, estabilidade, notebooks e relatório | Claude (~15 min) | A1 |
+| C1 | **FEITO em 24/11 com o corpus de 2.094 anúncios (sem as 49 páginas):** repetir a sequência: `hdb corpus`, `hdb topicos`, estabilidade, notebooks e relatório | Claude (~15 min) | A1 |
 | C2 | **Nomear os tópicos.** Os nomes do notebook são só sugestão. Ler as palavras e uns 5 anúncios de cada um | as 3 pessoas | C1 |
 | C3 | **Contextualização histórica** das leis do próprio período, com a dissertação indicada pela Fernanda | as 3 pessoas | — |
 | C4 | **De 2 a 3 slides por período**: tópicos, exemplos de anúncios, contexto | as 3 pessoas | C2 e C3 |
@@ -136,6 +138,7 @@ Todos os períodos passam de 100 anúncios. Antes de 1831, quase todos os anúnc
 |---|---|---|
 | D1 | **FEITO em 24/11.** Atualizar [guia_ferramenta.md](guia_ferramenta.md) e [linguagem_natural.md](linguagem_natural.md) com `corpus`, `topicos`, `c4`, `aluguel_incerto` e `--refazer` | Claude |
 | D2 | **FEITO em 24/11.** Atualizar a tabela de situação do [README](README.md) e de [projeto.md](projeto.md) | Claude |
+| D5 | **FEITO em 25/11.** Guia e linguagem natural atualizados com `c5`, `corp3`, `t5` e `t5i`, `rodar_tudo.py`, `avaliar_limpeza.py` e a repetição automática de consultas ao banco | Claude |
 | D3 | Tutorial de captura: a edição local do Diego (sem o passo do `.env`) ainda não foi commitada | Diego decide |
 | D4 | Confirmar com o professor a data da apresentação | Diego |
 

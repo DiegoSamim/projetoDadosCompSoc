@@ -7,8 +7,10 @@ rodarem sem rede.
 import os
 import random
 import re
+import time
 from datetime import datetime, timedelta
 
+import httpx
 from dotenv import load_dotenv
 
 from hdb import config
@@ -58,8 +60,56 @@ def periodo_legal_do_ano(ano):
     return "depois de 1888"
 
 
+ESPERAS = (1, 3)  # segundos antes da 2ª e da 3ª tentativa (3 tentativas no total)
+_ERROS_DE_REDE = (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.RemoteProtocolError)
+
+
+def _status_http(erro):
+    """Código HTTP de um erro do cliente (httpx ou PostgREST), ou None se não há."""
+    resposta = getattr(erro, "response", None)
+    for valor in (getattr(resposta, "status_code", None), getattr(erro, "status", None), getattr(erro, "code", None)):
+        if isinstance(valor, int) or (isinstance(valor, str) and valor.isdigit() and len(valor) == 3):
+            return int(valor)
+    return None
+
+
+def _retentavel(erro):
+    """Só falha passageira: tempo esgotado, conexão cortada, HTTP 5xx ou 429. Erro 4xx (SQL, permissão) não."""
+    if isinstance(erro, _ERROS_DE_REDE):
+        return True
+    status = _status_http(erro)
+    return status is not None and (status >= 500 or status == 429)
+
+
+def _com_tentativas(chamar, esperas=ESPERAS):
+    """Executa `chamar()`; nas falhas passageiras espera `esperas[i]` s e tenta de novo (len(esperas)+1 vezes)."""
+    for espera in esperas:
+        try:
+            return chamar()
+        except Exception as erro:
+            if not _retentavel(erro):
+                raise
+            time.sleep(espera)
+    return chamar()
+
+
+class _Retentando:
+    """Envolve o cliente do Supabase: todo `.execute()` da cadeia de consulta é refeito nas falhas passageiras."""
+
+    def __init__(self, objeto, banco):
+        self._objeto, self._banco = objeto, banco
+
+    def __getattr__(self, nome):
+        atributo = getattr(self._objeto, nome)
+        if nome == "execute":
+            return lambda *a, **k: _com_tentativas(lambda: atributo(*a, **k), self._banco._espera)
+        if callable(atributo):
+            return lambda *a, **k: _Retentando(atributo(*a, **k), self._banco)
+        return atributo
+
+
 def _todas(consulta, tamanho=1000):
-    """Todas as linhas de uma consulta ordenada; a API devolve no máximo 1000 por chamada."""
+    """Todas as linhas de uma consulta ordenada; a API devolve no máximo 1000 por chamada (cada uma com novas tentativas)."""
     linhas, inicio = [], 0
     while True:
         lote = consulta.range(inicio, inicio + tamanho - 1).execute().data
@@ -70,7 +120,20 @@ def _todas(consulta, tamanho=1000):
 
 
 class BancoSupabase:
-    """Acesso ao Supabase com a chave secreta (ignora RLS), lida do .env."""
+    """Acesso ao Supabase com a chave secreta (ignora RLS), lida do .env.
+
+    As chamadas ao banco são refeitas (até 3 tentativas; esperas em `_espera`) em tempo esgotado, conexão cortada e
+    HTTP 5xx/429; erros 4xx sobem direto."""
+
+    _espera = ESPERAS
+
+    @property
+    def cliente(self):
+        return _Retentando(self._cliente, self)
+
+    @cliente.setter
+    def cliente(self, valor):
+        self._cliente = valor
 
     def __init__(self):
         from supabase import create_client
@@ -81,7 +144,7 @@ class BancoSupabase:
         if faltam:
             raise RuntimeError(f"faltam {' e '.join(faltam)} no arquivo {config.RAIZ / '.env'} "
                                "(ver README, seção Banco e captura)")
-        self.cliente = create_client(url, chave)
+        self._cliente = create_client(url, chave)
 
     def _rpc(self, nome, **params):
         return self.cliente.rpc(nome, params).execute().data
@@ -212,6 +275,18 @@ class BancoSupabase:
     def registrar_corpus(self, versao, linhas):
         """Grava (upsert por anúncio e versão) as linhas [{anuncio_id, texto_padrao, n_palavras}]. Devolve quantas."""
         return self._rpc("registrar_corpus", p_versao=versao, p_linhas=linhas)
+
+    def ids_do_corpus(self, versao):
+        """Os `anuncio_id` gravados no corpus dessa versão."""
+        return [l["anuncio_id"] for l in _todas(self.cliente.table("anuncio_corpus").select("anuncio_id")
+                                                .eq("versao", versao).order("anuncio_id"))]
+
+    def remover_do_corpus(self, versao, ids):
+        """Apaga do corpus dessa versão os anúncios `ids` (os que deixaram de ser selecionados). Devolve quantos."""
+        ids = list(ids)
+        for i in range(0, len(ids), 100):
+            self.cliente.table("anuncio_corpus").delete().eq("versao", versao).in_("anuncio_id", ids[i:i + 100]).execute()
+        return len(ids)
 
     def anuncios_do_corpus(self, versao_corpus):
         """Anúncios do corpus como [{id, texto_padrao, periodo_legal, c_tipo, c_sexo, c_idade_min, ano}], por id."""
@@ -462,6 +537,15 @@ class BancoMemoria:
         for l in linhas:
             self.corpus[(l["anuncio_id"], versao)] = {**l, "versao": versao, "criado_em": self.agora()}
         return len(linhas)
+
+    def ids_do_corpus(self, versao):
+        return sorted(i for (i, v) in self.corpus if v == versao)
+
+    def remover_do_corpus(self, versao, ids):
+        ids = list(ids)
+        for i in ids:
+            self.corpus.pop((i, versao), None)
+        return len(ids)
 
     def anuncios_do_corpus(self, versao_corpus):
         ids = {a["id"]: self.paginas.get(pid, {}).get("ano") for (pid, _), lista in self.lista_anuncios.items() for a in lista}

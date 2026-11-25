@@ -67,6 +67,7 @@ Quais termos usar e quantas páginas cada um tem está em [termos_busca.md](term
 - Uma página `ok` nunca é capturada de novo.
 - Se a captura cair, as páginas reservadas voltam para a fila (na hora, ou em 30 minutos se o programa for fechado à força).
 - Falhas de captura voltam para a fila até 3 vezes. Falhas de OCR não voltam, porque capturar de novo daria o mesmo resultado; a imagem fica guardada para estudo.
+- Consultas ao banco que dão timeout, erro 5xx ou 429 (muitos pedidos seguidos) são repetidas até 3 vezes, sozinhas.
 
 ## O que precisa estar pronto
 
@@ -122,6 +123,8 @@ $PY -m hdb relatorio                                                        # 5.
 - Os passos abaixo explicam cada comando por dentro, para quem quiser ir além da amostra.
 
 ## Passo a passo
+
+Os passos abaixo explicam cada comando. Para refazer tudo de uma vez depois de uma captura, veja [Rodar tudo de uma vez](#rodar-tudo-de-uma-vez-rodar_tudopy).
 
 ### 1. Escolher o termo e o acervo
 
@@ -238,14 +241,15 @@ $PY -m hdb panorama --local RJ --periodo "1850 - 1859" --termo '"escrav* fugid*"
 ### 8. Extrair os campos dos anúncios: `campos`
 
 ```bash
-$PY -m hdb campos --versao-anuncios v2 --versao c4
+$PY -m hdb campos --versao-anuncios v2 --versao c5
 ```
 
 - Lê os anúncios já separados (versão `v2`) e, para cada um, grava na tabela `anuncio_campos`:
   - o **tipo**: `fuga`, `venda`, `compra`, `aluguel`, `ama_de_leite` ou `outro` (e `aluguel_incerto`, aluguel sem marca de escravizado, como "criada" ou "rapariga", que fica fora do corpus); e `procura`, que é verdadeiro quando quem anuncia quer obter alguém (COMPRA-SE, PRECISA-SE);
   - **sexo**, **idade** (mínima e máxima), **nações**, **cores**, **condição** (escravizado, forro, livre ou desconhecida), **nomes**, **ofícios**, **recompensa**, **valor** e **endereço**;
   - as **evidências**: o trecho do texto que justificou cada campo, para você conferir.
-- `--versao` (padrão `c4`, a atual) dá nome à versão da extração. Rodar de novo a mesma versão substitui; uma versão nova convive com as antigas. `--limite 100` processa só 100 anúncios, para testar.
+- Na versão `c5` (a atual), a **fuga** só vale com sinal de pessoa: palavra de pessoa, marca de escravizado, idade, nação, "de nome", sinal do corpo ou da roupa, ou dono. Sem nenhum desses, o anúncio vira `outro`. Também viram `outro` os anúncios de animal, de papel (cautela, bilhete), de remédio e de relato de navio, e "preto livre" explícito. "Cabra" só conta como pessoa com outra marca. A abertura FUGIO, FUGIU ou EVADIO-SE continua fuga mesmo com OCR ruim.
+- `--versao` (padrão `c5`, a atual) dá nome à versão da extração. Rodar de novo a mesma versão substitui; uma versão nova convive com as antigas. `--limite 100` processa só 100 anúncios, para testar.
 - Não usa internet nem CAPTCHA, só o banco. No fim imprime um resumo: anúncios por tipo e por sexo, quantos têm idade, as nações mais comuns, quantos têm nome e recompensa.
 
 **Limites da extração de campos:**
@@ -261,21 +265,29 @@ $PY -m hdb campos --versao-anuncios v2 --versao c4
 
 ```bash
 $PY -m hdb corpus
+$PY -m hdb corpus --incluir-incertos
 ```
 
-- Escolhe, entre os anúncios com campos (versão `c4`), os de pessoas escravizadas com texto legível, e grava o texto padronizado (sem acento, grafia atual, sem palavras vazias) ao lado do original, em `anuncio_corpus`.
-- `--versao` (padrão `corp2`) dá nome à versão; regravar a mesma substitui. `--versao-campos` escolhe a versão dos campos usada na seleção.
-- A saída diz quantos anúncios entraram no corpus e quantos foram descartados, com o motivo: tipo `outro`, aluguel sem marca de escravizado, OCR com confiança baixa ou ausente, e poucas palavras. Depois, a contagem por período legal.
+- Escolhe, entre os anúncios com campos (versão `c5`), os de pessoas escravizadas com texto legível, e grava o texto padronizado (sem acento, grafia atual, sem palavras vazias) ao lado do original, em `anuncio_corpus`.
+- `--versao` (padrão `corp3`, antes `corp2`) dá nome à versão; regravar a mesma substitui. `--versao-campos` escolhe a versão dos campos usada na seleção.
+- **`--incluir-incertos`** inclui os `aluguel_incerto` (aluguel sem marca de escravizado, como "criada") e grava a versão `corp3i`. Serve **só para comparar**: mostra se a conclusão muda quando esses anúncios entram. O corpus principal (`corp3`) não os inclui.
+- **Cortes feitos no `corp3`:**
+  - `cortar_colado`: quando o OCR colou dois anúncios num pedaço só, fica com o primeiro trecho que tem pessoa. O texto original nunca é alterado.
+  - `descobrir_ocr` (em `src/hdb/corpus.py`): acha e aplica os erros de OCR de "perda da primeira letra" (`luga`→`aluga`, `ozinha`→`cozinha`). Os demais candidatos só são listados, para revisão.
+- A saída diz quantos anúncios entraram no corpus e quantos foram descartados, com o motivo: tipo `outro`, aluguel sem marca de escravizado, fuga sem sinal de pessoa (`sem_pessoa`), OCR com confiança baixa ou ausente, e poucas palavras. Depois, a contagem por período legal.
+- Um anúncio `sem_pessoa` fica fora do modelo de tópicos, mas continua no banco e nos gráficos descritivos.
 
 ### 10. Modelar os tópicos: `topicos`
 
 ```bash
-$PY -m hdb topicos --topicos 6 --versao t3
-$PY -m hdb topicos --topicos 8 --versao t2
+$PY -m hdb topicos --topicos 6 --versao t5
 ```
 
 - Roda o LDA sobre o corpus e grava as palavras de cada tópico (`topico_palavras`), a mistura de tópicos de cada anúncio (`anuncio_topicos`) e o registro do modelo (`topico_modelos`), com o nome da versão.
-- `--topicos` (padrão 8), `--versao` (padrão `t2`) e `--semente` (padrão 0, para o resultado se repetir). O principal é `t3`, com 6 tópicos; `t2`, com 8, serve de comparação.
+- `--topicos` (padrão 8), `--versao` (padrão `t2`) e `--semente` (padrão 0, para o resultado se repetir). As versões atuais:
+  - **`t5`**: 6 tópicos, sobre o corpus `corp3`. É a principal.
+  - **`t5i`**: 6 tópicos, sobre o corpus `corp3i` (com os `aluguel_incerto`). Mede a sensibilidade da análise a esses anúncios.
+  - **`t4`**: corpus antigo (`corp2`). Fica para comparação.
 - A saída tem uma linha com o número de anúncios e a perplexidade. Depois, para cada tópico: quantos anúncios o têm como dominante, as palavras mais fortes e a divisão por período legal e por tipo.
 - O número de tópicos muda os temas: veja os Cuidados em [linguagem_natural.md](linguagem_natural.md). A estabilidade é medida com `scripts/estabilidade_topicos.py`. A comparação dos períodos está nos notebooks [topicos_por_periodo.ipynb](notebooks/topicos_por_periodo.ipynb) e [analise_descritiva.ipynb](notebooks/analise_descritiva.ipynb).
 
@@ -331,7 +343,7 @@ Anúncios de fuga com recompensa, por período legal (a view `anuncios_completos
 ```sql
 select periodo_legal, count(*) as anuncios
 from anuncios_completos
-where versao = 'v2' and c_versao = 'c4' and c_tipo = 'fuga' and c_recompensa
+where versao = 'v2' and c_versao = 'c5' and c_tipo = 'fuga' and c_recompensa
 group by periodo_legal
 order by periodo_legal;
 ```
@@ -341,7 +353,7 @@ Anúncios de venda de mulheres, com idade e nação:
 ```sql
 select ano, acervo, c_idade_min, c_idade_max, c_nacoes, c_nomes, c_valor, texto
 from anuncios_completos
-where versao = 'v2' and c_versao = 'c4' and c_tipo = 'venda' and c_sexo = 'f'
+where versao = 'v2' and c_versao = 'c5' and c_tipo = 'venda' and c_sexo = 'f'
 order by ano;
 ```
 
@@ -350,15 +362,37 @@ Conferir uma amostra de 20 anúncios com o trecho que justificou cada campo:
 ```sql
 select id, c_tipo, c_sexo, c_nacoes, c_evidencias, texto
 from anuncios_completos
-where versao = 'v2' and c_versao = 'c4'
+where versao = 'v2' and c_versao = 'c5'
 order by random()
 limit 20;
 ```
+
+## Rodar tudo de uma vez: `rodar_tudo.py`
+
+Depois de uma captura nova (por exemplo, o complemento), não é preciso rodar um comando por vez. O `rodar_tudo.py` refaz a sequência inteira:
+
+```bash
+PYTHONPATH=src $PY scripts/rodar_tudo.py
+PYTHONPATH=src $PY scripts/rodar_tudo.py --rapido --sem-notebooks
+PYTHONPATH=src $PY scripts/rodar_tudo.py --so topicos
+```
+
+| Opção | O que faz |
+|---|---|
+| `--rapido` | roda a versão mais curta do fluxo (`--help` mostra a lista completa de opções) |
+| `--sem-notebooks` | não refaz os cadernos (o último passo) |
+| `--so PASSO` | roda só um passo |
+
+- Os passos, nesta ordem: `campos`, `corpus`, `corpus_i`, `topicos`, `topicos_i`, `estabilidade`, `relatorio`, `notebooks`.
+- O comando **para no primeiro erro**. O registro de cada execução fica em `data/rodar_tudo.log`.
+- Os geradores dos cadernos ficam em `scripts/notebooks/`. Os comentários com números são reescritos à mão depois de cada rodada.
 
 ## Outros comandos
 
 | Comando | Para que serve |
 |---|---|
+| `scripts/avaliar_limpeza.py [arquivo]` | mede a limpeza do corpus contra uma conferência (por padrão, `tests/fixtures/conferencia.json`): quanto ruído sobra, quantos anúncios verdadeiros foram perdidos e se o tipo está certo. Sai com erro se as metas falharem: ruído cair pelo menos 50% e anúncios perdidos até 3%. O grupo pode refazer a conferência com os mesmos arquivos (`conferencia.json` e `conferencia_extra.json`). |
+| `rodar_tudo.py` | refaz o fluxo inteiro (veja a seção acima) |
 | `reprocessar` | refaz o OCR de imagens guardadas em disco (sem internet nem CAPTCHA) e mostra o antes e depois de cada página. Útil para testar melhorias do OCR. |
 | `importar` | carrega no banco dados da primeira versão da ferramenta (arquivos CSV e imagens antigas). Só foi usado uma vez. |
 | `palavras --subir [--pasta data/ocr_palavras]` | envia ao banco o cache de palavras do OCR que está no disco (sem OCR novo). Serve para as páginas separadas antes da mudança. |

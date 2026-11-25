@@ -20,6 +20,25 @@ def ajustar(textos, n_topicos, semente):
     return modelo, vetorizador, matriz
 
 
+def semente_representativa(textos, n_topicos, sementes=range(10)):
+    """A semente cujo modelo mais se parece com os das outras: (semente, {semente: similaridade média com as demais}).
+
+    O LDA depende da semente (3 anúncios a mais já reorganizaram os 6 tópicos de uma semente fixa). Em vez de apostar
+    na semente 0, ajusta uma vez por semente e fica com a mais "central": para cada par de modelos, cada tópico se
+    casa com o tópico mais parecido do outro (cosseno entre as distribuições de palavras) e se tira a média.
+    """
+    topicos = {}
+    for semente in sementes:
+        modelo, _, _ = ajustar(textos, n_topicos, semente)
+        pesos = modelo.components_ / modelo.components_.sum(axis=1, keepdims=True)
+        topicos[semente] = pesos / np.linalg.norm(pesos, axis=1, keepdims=True)
+    medias = {}
+    for a, ta in topicos.items():
+        outras = [float((ta @ tb.T).max(axis=1).mean()) for b, tb in topicos.items() if b != a]
+        medias[a] = sum(outras) / len(outras) if outras else 1.0
+    return max(medias, key=lambda a: (medias[a], -a)), medias
+
+
 def palavras_dos_topicos(modelo, vocabulario, n=config.TOPICOS_PALAVRAS):
     """Por tópico, as `n` palavras mais fortes como [(palavra, peso normalizado)] (pesos somam 1 no tópico inteiro)."""
     pesos = modelo.components_ / modelo.components_.sum(axis=1, keepdims=True)
@@ -78,11 +97,17 @@ def formatar_resumo(r):
 
 def processar(banco, versao_corpus=config.VERSAO_CORPUS, n_topicos=config.N_TOPICOS, semente=config.SEMENTE_TOPICOS,
               versao=config.VERSAO_TOPICOS):
-    """Ajusta o LDA sobre o corpus e grava (regravar a mesma `versao` substitui). Devolve o resumo."""
+    """Ajusta o LDA sobre o corpus e grava (regravar a mesma `versao` substitui). Devolve o resumo.
+
+    `semente` pode ser "auto": usa a semente mais representativa de 10 (`semente_representativa`).
+    """
     anuncios = [a for a in banco.anuncios_do_corpus(versao_corpus) if (a.get("texto_padrao") or "").strip()]
     if not anuncios:
         raise ValueError(f"corpus {versao_corpus!r} vazio: rode `hdb corpus` antes")
-    modelo, vetorizador, matriz = ajustar([a["texto_padrao"] for a in anuncios], n_topicos, semente)
+    textos = [a["texto_padrao"] for a in anuncios]
+    if semente == "auto":  # a mais representativa entre 10 sementes (ver `semente_representativa`)
+        semente, _ = semente_representativa(textos, n_topicos)
+    modelo, vetorizador, matriz = ajustar(textos, n_topicos, semente)
     vocabulario = vetorizador.get_feature_names_out()
     palavras = palavras_dos_topicos(modelo, vocabulario)
     mist = misturas(modelo, matriz)
