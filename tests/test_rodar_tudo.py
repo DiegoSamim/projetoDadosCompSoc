@@ -80,5 +80,6 @@ def test_notebooks_geram_e_executam_na_ordem(rt, monkeypatch):
                 ("gerar_tipos.py", None), ("executar_notebook.py", "mudanca_por_tipo"),
                 ("gerar_categorias.py", None), ("executar_notebook.py", "categorias_por_periodo"),
                 ("gerar_incerteza.py", None), ("executar_notebook.py", "incerteza"),
+                ("gerar_robustez.py", None), ("executar_notebook.py", "robustez_mistura"),
                 ("gerar_material.py", None), ("executar_notebook.py", "material_do_grupo")]
     assert [(Path(c[1]).name, Path(c[2]).stem if len(c) > 2 else None) for c in chamados] == esperado
