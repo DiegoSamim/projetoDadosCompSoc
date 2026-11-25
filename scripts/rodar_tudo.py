@@ -5,7 +5,7 @@ Uso: python scripts/rodar_tudo.py [--rapido] [--sem-notebooks] [--so PASSO]
 Passos, em ordem: campos, corpus, corpus_i, topicos, topicos_i, estabilidade, relatorio, resumo, notebooks.
 O passo `resumo` escreve resumo_dados.md (scripts/resumo_dados.py). O passo `notebooks` gera e executa, nesta ordem:
 analise_descritiva (gerar_analise), topicos_por_periodo (gerar_topicos), equilibrio_periodos (gerar_equilibrio),
-mudanca_por_tipo (gerar_tipos), categorias_por_periodo (gerar_categorias) e material_do_grupo (gerar_material).
+mudanca_por_tipo (gerar_tipos), categorias_por_periodo (gerar_categorias), incerteza (gerar_incerteza) e material_do_grupo (gerar_material).
 Cada um roda em um subprocesso (PYTHONPATH=src, mesmo Python). Para no primeiro erro e diz como retomar
 (`--so PASSO` roda só aquele). Grava tudo em data/rodar_tudo.log.
 """
@@ -24,7 +24,8 @@ ULTIMAS = 6
 # (gerador, caderno), na ordem em que são gerados e executados
 CADERNOS = [("gerar_analise.py", "analise_descritiva"), ("gerar_topicos.py", "topicos_por_periodo"),
             ("gerar_equilibrio.py", "equilibrio_periodos"), ("gerar_tipos.py", "mudanca_por_tipo"),
-            ("gerar_categorias.py", "categorias_por_periodo"), ("gerar_material.py", "material_do_grupo")]
+            ("gerar_categorias.py", "categorias_por_periodo"), ("gerar_incerteza.py", "incerteza"),
+            ("gerar_material.py", "material_do_grupo")]
 
 
 def _hdb(*args):
